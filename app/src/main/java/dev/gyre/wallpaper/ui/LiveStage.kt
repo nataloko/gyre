@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.gyre.wallpaper.data.GyreSettings
@@ -33,12 +34,11 @@ import dev.gyre.wallpaper.model.Remix
 private val TOP_SCRIM_HEIGHT = 132.dp
 
 /**
- * The artwork itself, at the size it will actually be worn.
+ * The artwork itself, filling the surface in the native shape this host supplied.
  *
  * This is the app's ground rather than a card inside it, so the renderer's own gestures — drag to
- * pan, two fingers for the next variant, three for the next piece — reach the whole screen, and a
- * filter set here looks exactly as it will on the home screen. The view is owned further up, in
- * `GyreApp`; this only draws it.
+ * pan, two fingers for the next variant, three for the next piece — reach the whole screen. The
+ * view is owned further up, in `GyreApp`; this only draws it.
  */
 @Composable
 fun LiveStage(
@@ -52,6 +52,7 @@ fun LiveStage(
     onNextDesign: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onPlay: (() -> Unit)? = null,
+    playEndInset: Dp = 0.dp,
 ) {
     Box(
         modifier = modifier
@@ -100,6 +101,7 @@ fun LiveStage(
             Box(
                 Modifier
                     .align(Alignment.TopEnd)
+                    .padding(end = playEndInset)
                     .statusBarsPadding()
                     .padding(10.dp)
                     .size(44.dp)

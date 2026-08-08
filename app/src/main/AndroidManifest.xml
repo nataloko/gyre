@@ -36,26 +36,25 @@
             layer. Compose still sees the new Configuration, so isSystemInDarkTheme() — and with it
             the automatic dark variants — keeps following the system.
 
-            The stage is the wallpaper rather than a picture of it, so it has to be the shape the
-            wallpaper actually is. A live wallpaper's surface follows the launcher, which does not
-            turn with the device, and the artwork is square: framing it against a landscape stage
-            would crop a different part of the scene at a different zoom from the one on the home
-            screen. nosensor pins the app to the orientation the launcher gives the service, so
-            the two agree by construction. configChanges stays for the sake of large screens,
-            where the platform ignores the request and rotates the window anyway.
+            Every surface is rendered in the shape the host supplies. fullUser follows the user's
+            rotation-lock preference while admitting portrait, landscape and both reverse
+            orientations when rotation is enabled; there is no portrait coordinate transform or
+            counter-rotation in the renderer.
 
-            DiscouragedApi is suppressed knowingly, and only here. The advice behind it is that an
-            app should adapt to the shape it is given, which is exactly what this one cannot do:
-            the shape is not the app's to choose, it is the launcher's, and adapting to a second
-            one would mean showing artwork the home screen never shows. From API 36 the platform
-            ignores the request anyway wherever the smallest width reaches 600dp, so this asks for
-            nothing on the large screens the check is written to protect.
+            The wallpaper service remains separate from this request: its surface belongs to the
+            launcher and a normal wallpaper engine cannot choose its dimensions. A portrait-only
+            launcher therefore keeps receiving a portrait wallpaper even while this activity can
+            show the native landscape result for a hypothetical landscape host.
+
+            DiscouragedApi is suppressed only here. fullUser expresses the user's own orientation
+            policy on compact displays rather than pinning one shape, and the adaptive layout still
+            handles every surface on larger displays where the platform ignores the request.
         -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode|keyboardHidden"
             android:exported="true"
-            android:screenOrientation="nosensor"
+            android:screenOrientation="fullUser"
             tools:ignore="DiscouragedApi">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -243,6 +243,29 @@ class SceneRendererTest {
         }
     }
 
+    /** Landscape is framed natively too; an off-centre turn must not expose the clear colour. */
+    @Test
+    fun aLandscapeOffCentreRotationCentreStillFillsTheScreen() {
+        val remix = catalogue.remix("taffy_hue_sorbet")
+        val offCentre = RotationCenter(0.72f, 0.31f)
+        OffscreenRenderer(context, width = 320, height = 180).use { renderer ->
+            // A fifth of the rotation period apart, so the sweep covers a full turn.
+            for (step in 0 until 5) {
+                val frame = renderer.render(
+                    remix = remix,
+                    rotationCenter = offCentre,
+                    monotonicNanos = step * 48_000_000_000L,
+                )
+                val cleared = frame.fractionMatching(CLEAR_COLOR)
+                Log.i("GyreVisual", "landscape offCentre step $step cleared=$cleared")
+                assertTrue(
+                    "background showed through on ${(cleared * 100).toInt()}% of the frame",
+                    cleared < MAX_CLEARED_FRACTION,
+                )
+            }
+        }
+    }
+
     @Test
     fun filtersChangeTheSceneInTheExpectedDirection() {
         val remix = catalogue.remix("afterglow_hue_biolume")

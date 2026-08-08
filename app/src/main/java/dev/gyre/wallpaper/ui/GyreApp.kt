@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -57,6 +56,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -97,10 +97,10 @@ private const val PANEL_ALPHA = 0.93f
  * The app is the wallpaper, full size, with a sheet pulled over it.
  *
  * There are no destinations and no preview: the renderer is the ground the whole interface stands
- * on, so what you are looking at is what you would be wearing, at the size you would wear it. The
- * sheet at rest shows the piece on the stage and every variant of it; pulled up it becomes the
- * collection. Two panels tune what the stage is doing — [LookPanel] over the artwork, since its
- * settings are things you judge by eye, and [BehaviourPanel] over everything, since its are not.
+ * on, so the artwork always fills the surface in the native shape this host supplied. The sheet at
+ * rest shows the piece on the stage and every variant of it; pulled up it becomes the collection.
+ * Two panels tune what the stage is doing — [LookPanel] over the artwork, since its settings are
+ * things you judge by eye, and [BehaviourPanel] over everything, since its are not.
  */
 /** How long a finished import stays on screen before the status line clears itself. */
 private const val IMPORT_NOTICE_MILLIS = 6_000L
@@ -190,7 +190,7 @@ fun GyreApp(
             }
         }
 
-        val stage = @Composable { modifier: Modifier ->
+        val stage = @Composable { modifier: Modifier, playEndInset: Dp ->
             LiveStage(
                 view = previewView,
                 remix = activeRemix,
@@ -204,6 +204,7 @@ fun GyreApp(
                 // Hidden under an open panel as well as in play: the panels leave the top of the
                 // stage showing, and it would sit on top of their own close button.
                 onPlay = if (playing || overlay != Overlay.NONE) null else ({ playing = true }),
+                playEndInset = playEndInset,
             )
         }
 
@@ -271,31 +272,43 @@ fun GyreApp(
             )
         }
 
-        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .testTag("app_root"),
+        ) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
                 if (maxWidth >= WIDE_LAYOUT_BREAKPOINT) {
                     // A wide window is a short one: the sheet would leave the stage a letterbox, so
-                    // the same content docks to the end edge instead and the stage keeps its height.
-                    Row(Modifier.fillMaxSize()) {
-                        Box(Modifier.weight(1f).fillMaxHeight()) {
-                            stage(Modifier.fillMaxSize())
-                            // Confined to the stage, because the centre of rotation it places is a
-                            // fraction of the surface being rendered, not of the window.
-                            look()
-                        }
-                        // In play the panel is not composed at all rather than slid away: there is
-                        // no sheet here to push off an edge, and the stage simply takes the room.
-                        if (!playing) {
+                    // the same content overlays the end edge. The renderer remains full-window, so
+                    // showing controls, hiding them or entering Play never changes its viewport.
+                    Box(Modifier.fillMaxSize()) {
+                        stage(Modifier.fillMaxSize(), SIDE_PANEL_WIDTH)
+                        // Look needs every coordinate of the rendered surface. Drop the side panel
+                        // while it is open and let centre placement cover the full native viewport.
+                        if (!playing && overlay != Overlay.LOOK) {
                             Column(
                                 Modifier
+                                    .align(Alignment.CenterEnd)
                                     .width(SIDE_PANEL_WIDTH)
                                     .fillMaxHeight()
                                     .testTag("side_panel")
                                     .background(
                                         MaterialTheme.colorScheme.surface.copy(alpha = PANEL_ALPHA),
                                     )
+                                    // The AndroidView remains directly behind the panel. Owning a
+                                    // pointer-input node across the whole panel keeps empty menu
+                                    // space from becoming a wallpaper gesture target.
+                                    .pointerInput(Unit) {
+                                        awaitPointerEventScope {
+                                            while (true) {
+                                                awaitPointerEvent().changes.forEach { it.consume() }
+                                            }
+                                        }
+                                    }
                                     .statusBarsPadding()
                                     .navigationBarsPadding(),
                             ) {
@@ -306,6 +319,7 @@ fun GyreApp(
                                 )
                             }
                         }
+                        look()
                     }
                 } else {
                     // Play and the sheet's position are the same fact, so they are kept in step in
@@ -372,7 +386,7 @@ fun GyreApp(
                         },
                         // The stage deliberately ignores the padding the scaffold offers: it runs
                         // under the sheet, which is the whole idea.
-                        content = { stage(Modifier.fillMaxSize()) },
+                        content = { stage(Modifier.fillMaxSize(), 0.dp) },
                     )
                     look()
                 }

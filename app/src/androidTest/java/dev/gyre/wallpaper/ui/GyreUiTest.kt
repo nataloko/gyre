@@ -1,5 +1,7 @@
 package dev.gyre.wallpaper.ui
 
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
@@ -39,6 +41,9 @@ import dev.gyre.wallpaper.MainActivity
 import dev.gyre.wallpaper.data.ActiveSelection
 import dev.gyre.wallpaper.data.GyreSettings
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.ExternalResource
@@ -338,6 +343,96 @@ class GyreUiTest {
             compose.onAllNodes(hasTestTag("enter_play")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("set_wallpaper").assertIsDisplayed()
+    }
+
+    @Test
+    fun landscapeUsesAFullWindowStageWithAnOverlaidPanel() {
+        val activity = compose.activity
+        val activityInfo = activity.packageManager.getActivityInfo(
+            activity.componentName,
+            PackageManager.ComponentInfoFlags.of(0),
+        )
+        assertEquals(ActivityInfo.SCREEN_ORIENTATION_FULL_USER, activityInfo.screenOrientation)
+
+        val originalOrientation = activity.requestedOrientation
+        try {
+            compose.activityRule.scenario.onActivity {
+                it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+            compose.waitUntil(timeoutMillis = 10_000) {
+                compose.activity.resources.configuration.orientation ==
+                    Configuration.ORIENTATION_LANDSCAPE
+            }
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodes(hasTestTag("side_panel")).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.waitForIdle()
+            assertSame("rotation must not recreate the activity", activity, compose.activity)
+
+            val rootBounds = compose.onNodeWithTag("app_root").fetchSemanticsNode().boundsInRoot
+            val stageBounds = compose.onNodeWithTag("live_stage").fetchSemanticsNode().boundsInRoot
+            val panelBounds = compose.onNodeWithTag("side_panel").fetchSemanticsNode().boundsInRoot
+            val playBounds = compose.onNodeWithTag("enter_play").fetchSemanticsNode().boundsInRoot
+            var windowWidth = 0
+            var windowHeight = 0
+            compose.activityRule.scenario.onActivity {
+                windowWidth = it.window.decorView.width
+                windowHeight = it.window.decorView.height
+            }
+
+            assertEquals(windowWidth.toFloat(), rootBounds.width, 0.5f)
+            assertEquals(windowHeight.toFloat(), rootBounds.height, 0.5f)
+            assertEquals("the renderer must fill the window", rootBounds, stageBounds)
+            assertEquals(rootBounds.top, panelBounds.top, 0.5f)
+            assertEquals(rootBounds.right, panelBounds.right, 0.5f)
+            assertEquals(rootBounds.bottom, panelBounds.bottom, 0.5f)
+            assertTrue("the panel must overlay the stage", panelBounds.left > stageBounds.left)
+            assertTrue("Play must remain outside the panel", playBounds.right <= panelBounds.left)
+
+            compose.onNodeWithTag("open_look").performClick()
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodes(hasTestTag("look_panel")).fetchSemanticsNodes().isNotEmpty() &&
+                    compose.onAllNodes(hasTestTag("side_panel")).fetchSemanticsNodes().isEmpty()
+            }
+            assertEquals(
+                rootBounds,
+                compose.onNodeWithTag("look_panel").fetchSemanticsNode().boundsInRoot,
+            )
+
+            compose.onNodeWithTag("look_tab_centre").performClick()
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodes(hasTestTag("centre_stage")).fetchSemanticsNodes().isNotEmpty()
+            }
+            assertEquals(
+                "centre placement must use the whole rendered surface",
+                rootBounds,
+                compose.onNodeWithTag("centre_stage").fetchSemanticsNode().boundsInRoot,
+            )
+            assertEquals(
+                "opening Look must not resize the renderer",
+                rootBounds,
+                compose.onNodeWithTag("live_stage").fetchSemanticsNode().boundsInRoot,
+            )
+
+            compose.onNodeWithTag("close_look").performClick()
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodes(hasTestTag("look_panel")).fetchSemanticsNodes().isEmpty() &&
+                    compose.onAllNodes(hasTestTag("side_panel")).fetchSemanticsNodes().isNotEmpty()
+            }
+            compose.onNodeWithTag("enter_play").performClick()
+            compose.waitUntil(timeoutMillis = 5_000) {
+                compose.onAllNodes(hasTestTag("side_panel")).fetchSemanticsNodes().isEmpty()
+            }
+            assertEquals(
+                "entering Play must not resize the renderer",
+                rootBounds,
+                compose.onNodeWithTag("live_stage").fetchSemanticsNode().boundsInRoot,
+            )
+        } finally {
+            compose.activityRule.scenario.onActivity {
+                it.requestedOrientation = originalOrientation
+            }
+        }
     }
 
     @Test
