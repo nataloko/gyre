@@ -75,15 +75,29 @@ jobs:
 
       # Rendering the catalogue is the long pole, so it is keyed on everything that can change what
       # it renders. A hit means these images already came from exactly these inputs.
+      #
+      # The key is worked out once, here, and reused by both the restore and the save. hashFiles
+      # reads the workspace rather than the commit, and running the generator leaves __pycache__
+      # under tools/artwork/ — which `tools/artwork/**` matches. Evaluating the expression a second
+      # time after that would save the cache under a key no clean checkout can ever ask for, which
+      # is exactly what happened before this step existed.
+      - name: Work out the artwork cache key
+        id: key
+        run: >
+          echo "value=artwork-${{ hashFiles('tools/catalog/**', 'tools/artwork/**',
+          'tools/generate_catalog.py', 'tools/gyre_palette.py') }}" >> "$GITHUB_OUTPUT"
+
       - name: Restore the generated artwork
         id: artwork
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: app/src/main/assets/artwork
-          key: artwork-${{ hashFiles('tools/catalog/**', 'tools/artwork/**', 'tools/generate_catalog.py', 'tools/gyre_palette.py') }}
+          key: ${{ steps.key.outputs.value }}
 
       - name: Generate the catalogue
         if: steps.artwork.outputs.cache-hit != 'true'
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
         run: uv run tools/generate_catalog.py
 
       # Saved before the build, so a failure downstream does not cost another render on the retry.
@@ -92,7 +106,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: app/src/main/assets/artwork
-          key: artwork-${{ hashFiles('tools/catalog/**', 'tools/artwork/**', 'tools/generate_catalog.py', 'tools/gyre_palette.py') }}
+          key: ${{ steps.key.outputs.value }}
 
       - name: Install the Android SDK packages
         run: .github/install-android-sdk.sh
