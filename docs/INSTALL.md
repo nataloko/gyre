@@ -93,10 +93,10 @@ into it — which is how a collection Gyre cannot bundle reaches a phone.
 
 ```sh
 uv run tools/export_pack.py \
-    --assets ../gyre-other/app/src/main/assets \
-    --name "Originals" \
-    --out dist/gyre-originals.zip
-adb push dist/gyre-originals.zip /sdcard/Download/
+    --assets /path/to/another/asset/tree \
+    --name "A Collection" \
+    --out dist/a-collection.zip
+adb push dist/a-collection.zip /sdcard/Download/
 ```
 
 The exporter verifies every file against its own content address before writing

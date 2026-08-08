@@ -4,14 +4,14 @@
 # ///
 """Package a Gyre asset tree as a pack the app can import.
 
-Gyre bundles only artwork it generates itself. A catalogue it cannot ship — the original
-artwork on `main`, or anything else laid out the same way — becomes a pack instead: one zip
-holding a manifest, the catalogue and the artwork, side-loaded onto the phone and imported
-through the app's collection sheet.
+Gyre bundles only artwork it generates itself. A catalogue it cannot ship — anything this
+repository does not license, or any asset tree laid out the same way — becomes a pack
+instead: one zip holding a manifest, the catalogue and the artwork, side-loaded onto the
+phone and imported through the app's collection sheet.
 
-    uv run tools/export_pack.py --assets ../gyre-main/app/src/main/assets \\
-        --name "Originals" --out dist/gyre-originals.zip
-    uv run tools/export_pack.py --verify dist/gyre-originals.zip
+    uv run tools/export_pack.py --assets /path/to/another/asset/tree \\
+        --name "A Collection" --out dist/a-collection.zip
+    uv run tools/export_pack.py --verify dist/a-collection.zip
 
 Nothing here decodes an image: dimensions are read from the file headers, so the script needs
 no Pillow and runs wherever a checkout does.
