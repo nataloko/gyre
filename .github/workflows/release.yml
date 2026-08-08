@@ -57,8 +57,13 @@ jobs:
       - name: Generate the catalogue
         run: uv run tools/generate_catalog.py
 
-      - name: Check the rebuild reproduced byte for byte
-        run: git diff --exit-code -- app/src/main/assets/catalog
+      # Not a comparison against the committed manifests — see the note in ci.yml about why that
+      # cannot hold across machines. This checks the catalogue this job rendered is well formed and
+      # its chrome is legible; tools/package_release.py then checks the APK against its own manifest.
+      - name: Check the render this job will ship
+        run: >
+          ./gradlew --no-daemon --rerun-tasks testDebugUnitTest
+          --tests '*CatalogSchemaTest' --tests '*ArtworkColorSchemeTest'
 
       # The build refuses to fall back to the debug key, so without these the release simply fails.
       - name: Write the signing configuration

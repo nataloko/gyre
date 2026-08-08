@@ -135,7 +135,17 @@ git diff --exit-code -- app/src/main/assets/catalog
 Those two manifests are the part of the catalogue that is tracked, and
 `checksums.json` holds the SHA-256 of every generated image. So a clean diff
 there is a complete statement that the rebuild reproduced all 948 of them, byte
-for byte. CI runs the same check whenever anything under `tools/` changes.
+for byte.
+
+That holds on one machine, not across machines. NumPy dispatches different SIMD
+kernels depending on the CPU, and the last-bit differences that follow
+occasionally change a quantised pixel, which changes that file's content
+address. Disabling AVX-512 on a single machine is enough to move about a tenth
+of the hashes. The pictures are the same — under 0.02% of pixels differ by more
+than a rounding step, and those sit on anti-aliasing boundaries — so the
+identifiers move while the artwork does not. CI therefore checks that the
+catalogue it rendered is well formed and legible, rather than that it matches
+the manifests committed from somewhere else.
 
 The source definitions for pieces, layers, rotations, and variants are in:
 
