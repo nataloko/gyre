@@ -530,7 +530,7 @@ scaler = 0.25
   label = "Frost Cathedral"
   palette = "5"
 
-# Six regular {p, q} triangle groups, folded by reflections in Poincare geodesics. swirls2 gave
+# Six regular {p, q} triangle groups, folded by reflections in Poincare geodesics. Upstream gave
 # this one a scaler of 0.38, which is not a whole number of turns over the spin wrap; 0.25 is,
 # and suits a piece whose detail is finest exactly where a fast spin would smear it.
 [[design]]

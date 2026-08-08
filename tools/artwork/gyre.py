@@ -43,7 +43,7 @@ BAND_GROUPS: tuple[tuple[int, ...], ...] = (
 )
 
 # The families this module renders, the way circle_limits.py carries its own. The
-# only line here that is not in the upstream copy in swirls2.
+# only line here that is not in the upstream copy these renderers were vendored from.
 GYRE_DESIGN_IDS = frozenset({"spinner_gyre"})
 
 
