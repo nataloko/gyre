@@ -1,5 +1,5 @@
 {
-  description = "Gyre Android 17 development environment";
+  description = "Paperouette Android 17 development environment";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 

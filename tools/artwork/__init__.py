@@ -1,4 +1,4 @@
-"""The artwork renderers — twenty-four generative designs behind Gyre's catalogue.
+"""The artwork renderers — twenty-four generative designs behind Paperouette's catalogue.
 
 Each module renders resolved RGB/RGBA layers keyed by variant;
 `generate_catalog.py` drives them and owns everything catalogue-shaped.

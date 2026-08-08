@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Verify and package Gyre's signed release APK with its SHA-256 checksum."""
+"""Verify and package Paperouette's signed release APK with its SHA-256 checksum."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from pathlib import Path
 
 
 MAX_APK_BYTES = 450 * 1024 * 1024
-EXPECTED_PACKAGE = "dev.gyre.wallpaper"
+EXPECTED_PACKAGE = "dev.paperouette.wallpaper"
 EXPECTED_API = "37"
 # One image per layer reference plus one thumb per remix, less the sharing among effect
 # variants, whose layers deduplicate by content address.
@@ -29,8 +29,8 @@ EXPECTED_CATALOG_FILES = {
     "assets/catalog/checksums.json",
 }
 EXPECTED_COMPONENTS = {
-    "activity": {"dev.gyre.wallpaper.MainActivity"},
-    "service": {"dev.gyre.wallpaper.wallpaper.GyreWallpaperService"},
+    "activity": {"dev.paperouette.wallpaper.MainActivity"},
+    "service": {"dev.paperouette.wallpaper.wallpaper.PaperouetteWallpaperService"},
     "receiver": set(),
     "provider": set(),
 }
@@ -228,7 +228,7 @@ def main() -> int:
             check=True,
         )
         args.output_dir.mkdir(parents=True, exist_ok=True)
-        output = args.output_dir / f"Gyre-{version}-release.apk"
+        output = args.output_dir / f"Paperouette-{version}-release.apk"
         shutil.copy2(args.apk, output)
         checksum = sha256_file(output)
         (args.output_dir / "SHA256SUMS").write_text(

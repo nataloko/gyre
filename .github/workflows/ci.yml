@@ -1,4 +1,4 @@
-# Gyre's artwork is not in the repository. It is a build product of tools/catalog/ and
+# Paperouette's artwork is not in the repository. It is a build product of tools/catalog/ and
 # tools/artwork/, so this workflow generates it before it can package an APK.
 #
 # What it deliberately does not do is compare the result against the committed manifests. The
@@ -85,7 +85,7 @@ jobs:
         id: key
         run: >
           echo "value=artwork-${{ hashFiles('tools/catalog/**', 'tools/artwork/**',
-          'tools/generate_catalog.py', 'tools/gyre_palette.py') }}" >> "$GITHUB_OUTPUT"
+          'tools/generate_catalog.py', 'tools/paperouette_palette.py') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore the generated artwork
         id: artwork
@@ -125,7 +125,7 @@ jobs:
       - name: Publish the APK
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: Gyre-debug-${{ github.sha }}
+          name: Paperouette-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
           # An APK is a zip already; compressing it again buys nothing and costs minutes.
           compression-level: 0

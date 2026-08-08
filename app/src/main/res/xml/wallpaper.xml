@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <wallpaper xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/wallpaper_description"
-    android:settingsActivity="dev.gyre.wallpaper.MainActivity"
+    android:settingsActivity="dev.paperouette.wallpaper.MainActivity"
     android:thumbnail="@drawable/wallpaper_thumbnail" />
 

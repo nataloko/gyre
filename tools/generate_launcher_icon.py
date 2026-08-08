@@ -9,7 +9,7 @@ middle of the canvas, which is what gives the icon its lean. Two inks: the
 plates alternate between the ink and the paper the background layer supplies,
 and the innermost plate is the accent.
 
-Like the rest of Gyre's artwork this is maths rather than pixels, so the two
+Like the rest of Paperouette's artwork this is maths rather than pixels, so the two
 drawables are build products. Change a constant here and run
 
     uv run tools/generate_launcher_icon.py

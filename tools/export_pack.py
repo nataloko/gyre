@@ -2,9 +2,9 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Package a Gyre asset tree as a pack the app can import.
+"""Package a Paperouette asset tree as a pack the app can import.
 
-Gyre bundles only artwork it generates itself. A catalogue it cannot ship — anything this
+Paperouette bundles only artwork it generates itself. A catalogue it cannot ship — anything this
 repository does not license, or any asset tree laid out the same way — becomes a pack
 instead: one zip holding a manifest, the catalogue and the artwork, side-loaded onto the
 phone and imported through the app's collection sheet.
@@ -289,7 +289,7 @@ def write_pack(out: Path, assets: Path, manifest: dict, blob: str, entries: list
     temporary = out.with_suffix(out.suffix + ".tmp")
     with zipfile.ZipFile(temporary, "w") as archive:
         archive.writestr(
-            zipfile.ZipInfo("gyre-pack.json"),
+            zipfile.ZipInfo("paperouette-pack.json"),
             json.dumps(manifest, indent=1, ensure_ascii=False, sort_keys=True),
             zipfile.ZIP_DEFLATED,
         )
@@ -306,16 +306,16 @@ def verify(pack: Path) -> int:
     """Re-reads a pack the way the app will, in the order the app will."""
     with zipfile.ZipFile(pack) as archive:
         names = archive.namelist()
-        if not names or names[0] != "gyre-pack.json":
-            raise PackError("gyre-pack.json is not the first entry; the app streams and would miss it")
-        manifest = json.loads(archive.read("gyre-pack.json"))
+        if not names or names[0] != "paperouette-pack.json":
+            raise PackError("paperouette-pack.json is not the first entry; the app streams and would miss it")
+        manifest = json.loads(archive.read("paperouette-pack.json"))
         if manifest.get("formatVersion") != FORMAT_VERSION:
             raise PackError(f"unknown pack format {manifest.get('formatVersion')}")
         catalogue = json.loads(archive.read("catalog/catalog.json"))
         validate_catalogue(catalogue, archive.read("catalog/catalog.json").decode("utf-8"))
 
         declared = {entry["path"]: entry for entry in manifest["assets"]}
-        present = set(names) - {"gyre-pack.json", "catalog/catalog.json"}
+        present = set(names) - {"paperouette-pack.json", "catalog/catalog.json"}
         if present != set(declared):
             missing = sorted(set(declared) - present)[:5]
             extra = sorted(present - set(declared))[:5]

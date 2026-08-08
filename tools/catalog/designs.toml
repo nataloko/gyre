@@ -18,27 +18,27 @@
 # on, so its tile is the one already carrying the selection ring when the sheet comes up.
 
 [[design]]
-id = "gyrestack"
-label = "Gyre Stack"
-family = "spinner_gyre"
+id = "ribbonstack"
+label = "Ribbon Stack"
+family = "spinner_ribbon_stack"
 scaler = 0.25
 
   [[design.layer]]
-  source = "procedural/originals/spinner_gyre/background.webp"
+  source = "procedural/originals/spinner_ribbon_stack/background.webp"
   parallax = 0.0
 
   [[design.layer]]
-  source = "procedural/originals/spinner_gyre/outer.png"
+  source = "procedural/originals/spinner_ribbon_stack/outer.png"
   rotation = 420.0
   parallax = 0.12
 
   [[design.layer]]
-  source = "procedural/originals/spinner_gyre/middle.png"
+  source = "procedural/originals/spinner_ribbon_stack/middle.png"
   rotation = -300.0
   parallax = 0.24
 
   [[design.layer]]
-  source = "procedural/originals/spinner_gyre/inner.png"
+  source = "procedural/originals/spinner_ribbon_stack/inner.png"
   rotation = 180.0
   parallax = 0.36
 

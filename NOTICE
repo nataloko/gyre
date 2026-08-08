@@ -1,5 +1,5 @@
-Gyre
-Copyright 2026 the Gyre authors.
+Paperouette
+Copyright 2026 the Paperouette authors.
 
 The Apache License, Version 2.0 applies to this repository's source code,
 procedural catalogue definitions, and artwork generated from them by
@@ -7,4 +7,4 @@ tools/generate_catalog.py.
 
 Artwork imported into the app at runtime is not covered by this licence and is
 not distributed with it. It belongs to whoever made it, on whatever terms they
-set; Gyre only copies it into its own storage on the phone it was imported on.
+set; Paperouette only copies it into its own storage on the phone it was imported on.

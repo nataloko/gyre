@@ -5,7 +5,7 @@
 #   "pillow==11.3.0",
 # ]
 # ///
-"""Generate Gyre's catalogue of layered generative artwork.
+"""Generate Paperouette's catalogue of layered generative artwork.
 
 Every piece is maths, not pixels. The renderers live in `tools/artwork/` — ten
 generative systems (reaction-diffusion, strange attractors, quasicrystal interference,
@@ -44,7 +44,7 @@ from typing import Any
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent))
-import gyre_palette as palette  # noqa: E402
+import paperouette_palette as palette  # noqa: E402
 from artwork.catalog import load_catalog  # noqa: E402
 from artwork.core import rng_for  # noqa: E402
 from artwork.spirals import (  # noqa: E402
@@ -68,10 +68,10 @@ from artwork.circle_limits import (  # noqa: E402
     CIRCLE_LIMIT_DESIGN_IDS,
     render_circle_limit,
 )
-from artwork.gyre import (  # noqa: E402
-    GYRE,
-    GYRE_DESIGN_IDS,
-    render_gyre,
+from artwork.ribbon_stack import (  # noqa: E402
+    RIBBON_STACK,
+    RIBBON_STACK_DESIGN_IDS,
+    render_ribbon_stack,
 )
 from artwork.planetarium import PLANETARIUM  # noqa: E402
 
@@ -161,11 +161,11 @@ def variant_palette(family: str, key: str) -> list[str]:
             # is coloured with, and on a phone the framing keeps it almost entirely off screen.
             recipe = CIRCLE_LIMITS[key]
             return [*recipe.colors, recipe.ink, recipe.accent]
-        case "spinner_gyre":
+        case "spinner_ribbon_stack":
             # The paper counts here, unlike the circle limits above. There it is a surround
             # the framing cuts away; here it is layer 0, a plate of flat colour under the
             # whole scene, so it is most of what the chrome has to stay legible against.
-            recipe = GYRE[key]
+            recipe = RIBBON_STACK[key]
             return [recipe.paper, recipe.ink, recipe.accent]
         case other:
             raise ValueError(f"No palette source for family: {other}")
@@ -312,10 +312,10 @@ def render_layer_image(design: dict[str, Any], layer_index: int, palette_key: st
         source = design["layer"][layer_index]["source"]
         rng = rng_for(SEED, source_remix, layer_index, source)
         return render_circle_limit(palette_key, size, size, rng)
-    if family in GYRE_DESIGN_IDS:
+    if family in RIBBON_STACK_DESIGN_IDS:
         # No rng key at all: alone among the renderers this one makes no random choice, so
         # the layer is settled by its palette and its depth and there is nothing to seed.
-        return render_gyre(palette_key, size, size, layer_index)
+        return render_ribbon_stack(palette_key, size, size, layer_index)
     return render_outlier(family, palette_key, size, size, layer_index, SEED)
 
 

@@ -2,7 +2,7 @@
 # requires-python = ">=3.12"
 # dependencies = []
 # ///
-"""Create Gyre's ignored persistent release key and local credentials."""
+"""Create Paperouette's ignored persistent release key and local credentials."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from pathlib import Path
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--keystore", type=Path, default=Path("gyre-release.jks"))
+    parser.add_argument("--keystore", type=Path, default=Path("paperouette-release.jks"))
     parser.add_argument("--properties", type=Path, default=Path("keystore.properties"))
     return parser.parse_args()
 
@@ -41,7 +41,7 @@ def main() -> int:
         "-storetype",
         "PKCS12",
         "-alias",
-        "gyre",
+        "paperouette",
         "-keyalg",
         "RSA",
         "-keysize",
@@ -49,7 +49,7 @@ def main() -> int:
         "-validity",
         "10000",
         "-dname",
-        "CN=Gyre, OU=Private, O=Gyre",
+        "CN=Paperouette, OU=Private, O=Paperouette",
         "-storepass",
         password,
         "-keypass",
@@ -63,7 +63,7 @@ def main() -> int:
                 [
                     f"storeFile={args.keystore}",
                     f"storePassword={password}",
-                    "keyAlias=gyre",
+                    "keyAlias=paperouette",
                     f"keyPassword={password}",
                     "",
                 ]

@@ -1,6 +1,6 @@
-# Build, install, and preserve Gyre
+# Build, install, and preserve Paperouette
 
-Gyre is fully offline. Its complete artwork collection is procedurally
+Paperouette is fully offline. Its complete artwork collection is procedurally
 generated in this repository and bundled into the APK, so installing it never
 needs a network connection.
 
@@ -28,10 +28,10 @@ If this checkout does not have signing credentials yet, create them once:
 uv run tools/create_release_key.py
 ```
 
-Back up both `gyre-release.jks` and `keystore.properties` in a secure location.
+Back up both `paperouette-release.jks` and `keystore.properties` in a secure location.
 They are intentionally ignored by Git. Every future upgrade must use this same
 key; if it is lost, Android will refuse to install an update over an existing
-copy of Gyre.
+copy of Paperouette.
 
 Build, verify, and package the release:
 
@@ -40,7 +40,7 @@ Build, verify, and package the release:
 uv run tools/package_release.py
 ```
 
-The package is written to `dist/Gyre-<versionName>-release.apk`. Its version is
+The package is written to `dist/Paperouette-<versionName>-release.apk`. Its version is
 read from the APK itself, so it always matches `app/build.gradle.kts`.
 `dist/SHA256SUMS` lists the checksum for only that package. Before releasing a
 changed build, increment both `versionCode` and `versionName`; Android will not
@@ -72,13 +72,13 @@ port changes and reboots.
 Install the APK:
 
 ```sh
-adb install -r dist/Gyre-<version>-release.apk
+adb install -r dist/Paperouette-<version>-release.apk
 ```
 
 `-r` upgrades an existing same-key installation without clearing settings. If
 more than one phone is attached, add `-s <serial>` to select one.
 
-Open Gyre, pull up the sheet to choose a piece and variant, and select **Set
+Open Paperouette, pull up the sheet to choose a piece and variant, and select **Set
 wallpaper**. Android then shows its standard live-wallpaper preview before
 applying it.
 
@@ -89,7 +89,7 @@ remains on existing phones.
 ## Build and side-load an artwork pack
 
 A pack carries a catalogue and its artwork into the app without being compiled
-into it — which is how a collection Gyre cannot bundle reaches a phone.
+into it — which is how a collection Paperouette cannot bundle reaches a phone.
 
 ```sh
 uv run tools/export_pack.py \
@@ -114,11 +114,11 @@ of photographs.
 
 ## Check offline operation
 
-Enable airplane mode. Clear only system or download caches, not Gyre's app
+Enable airplane mode. Clear only system or download caches, not Paperouette's app
 data. Then verify that the live stage, collection, variant strip, Look and
 Behaviour panels, and installed wallpaper still work.
 
-They should: Gyre has no network permission or runtime HTTP library, and every
+They should: Paperouette has no network permission or runtime HTTP library, and every
 procedurally generated artwork layer needed at runtime ships in the APK.
 
 ## What must never be published

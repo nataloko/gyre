@@ -75,9 +75,9 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > gyre-release.jks
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > paperouette-release.jks
           {
-              printf 'storeFile=gyre-release.jks\n'
+              printf 'storeFile=paperouette-release.jks\n'
               printf 'storePassword=%s\n' "$RELEASE_STORE_PASSWORD"
               printf 'keyAlias=%s\n' "$RELEASE_KEY_ALIAS"
               printf 'keyPassword=%s\n' "$RELEASE_KEY_PASSWORD"
@@ -92,7 +92,7 @@ jobs:
 
       - name: Remove the signing material
         if: always()
-        run: shred -u gyre-release.jks keystore.properties 2>/dev/null || true
+        run: shred -u paperouette-release.jks keystore.properties 2>/dev/null || true
 
       - name: Publish the release
         env:
@@ -100,8 +100,8 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "$GITHUB_REF_NAME" \
-              --title "Gyre ${{ steps.version.outputs.version }}" \
+              --title "Paperouette ${{ steps.version.outputs.version }}" \
               --generate-notes \
               ${{ steps.version.outputs.prerelease }} \
-              dist/Gyre-${{ steps.version.outputs.version }}-release.apk \
+              dist/Paperouette-${{ steps.version.outputs.version }}-release.apk \
               dist/SHA256SUMS

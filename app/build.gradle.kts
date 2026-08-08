@@ -18,12 +18,12 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "dev.gyre.wallpaper"
+    namespace = "dev.paperouette.wallpaper"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 
     defaultConfig {
-        applicationId = "dev.gyre.wallpaper"
+        applicationId = "dev.paperouette.wallpaper"
         minSdk = 37
         targetSdk = 37
         versionCode = 27

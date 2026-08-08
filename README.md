@@ -1,24 +1,24 @@
-# Gyre
+# Paperouette
 
-[![CI](https://github.com/nataloko/gyre/actions/workflows/ci.yml/badge.svg)](https://github.com/nataloko/gyre/actions/workflows/ci.yml)
+[![CI](https://github.com/nataloko/Paperouette/actions/workflows/ci.yml/badge.svg)](https://github.com/nataloko/Paperouette/actions/workflows/ci.yml)
 
-Gyre is a fully offline live wallpaper for Android 17, inspired in part by
+Paperouette is a fully offline live wallpaper for Android 17, inspired in part by
 SwirlWalls — the wonderfully playful spinner wallpaper that now appears to be
-retired and is no longer available on Google Play. Gyre carries that idea in
+retired and is no longer available on Google Play. Paperouette carries that idea in
 its own direction: layered, touch-responsive artwork that reacts to your hand,
 the phone's tilt, and the launcher.
 
 ## Artwork made from scratch
 
-Every piece bundled with Gyre is procedurally generated. There are no downloads,
+Every piece bundled with Paperouette is procedurally generated. There are no downloads,
 online services, or stock-art libraries hiding behind it. The whole collection
 can be rebuilt locally from the definitions in `tools/catalog/` and the
 renderers in `tools/artwork/`.
 
 The catalogue contains 26 pieces and 352 variants:
 
-- Gyre Stack, the launcher icon's own geometry: nineteen square plates on one
-  centred axis, their bands turning in three independent groups.
+- Ribbon Stack: nineteen square plates on one centred axis, their bands turning
+  in three independent groups.
 - Five layered spinner scenes.
 - Six generative systems: reaction-diffusion, strange attractors,
   quasicrystal interference, recursive Truchet tiling, a Kleinian limit set,
@@ -39,18 +39,18 @@ same when it makes a downloadable build.
 
 Even the apparently random choices are repeatable. They come from seeded random
 number generators tied to catalogue identifiers, which is why those identifiers
-must not be renamed.
+must remain stable once a collection has shipped.
 
 ## Add your own artwork
 
 The bundled collection is only the starting point. Choose **Import** in the
-collection sheet to add a folder or zip from your phone alongside Gyre's own
+collection sheet to add a folder or zip from your phone alongside Paperouette's own
 generated pieces.
 
-Gyre works out what you gave it:
+Paperouette works out what you gave it:
 
 - **A pack**: a catalogue and its artwork, built by `tools/export_pack.py` from
-  any Gyre asset tree and side-loaded onto the phone. Its checksums are verified
+  any Paperouette asset tree and side-loaded onto the phone. Its checksums are verified
   as it copies.
 - **Pictures**: any folder or zip of photographs. Each becomes a variant of one
   new piece, centre-cropped square so it turns, flicks and nudges like the rest
@@ -58,17 +58,17 @@ Gyre works out what you gave it:
 
 Imported artwork is copied into the app's own storage, so moving or deleting
 the original will not break your wallpaper. You can remove an import again from
-the header above the pieces it added. Nothing is uploaded, and Gyre has no
+the header above the pieces it added. Nothing is uploaded, and Paperouette has no
 network permission; the system file picker is the only place it asks for
 anything outside itself.
 
 ## License
 
-Gyre is licensed under the [Apache License 2.0](LICENSE). This covers the app,
+Paperouette is licensed under the [Apache License 2.0](LICENSE). This covers the app,
 the procedural generators and catalogue definitions, and the artwork generated
 from them by `tools/generate_catalog.py`. See [NOTICE](NOTICE) for attribution.
 
-## Work on Gyre
+## Work on Paperouette
 
 You need JDK 17, `uv`, and an Android SDK containing:
 
@@ -106,12 +106,12 @@ git config core.hooksPath tools/hooks
 ```
 
 Before a push, this runs `testDebugUnitTest lintDebug`, the same checks CI runs
-on the other side. Set `GYRE_SKIP_VERIFY=1` to skip them for one push.
+on the other side. Set `PAPEROUETTE_SKIP_VERIFY=1` to skip them for one push.
 
 `flake.nix` remains only for a possible return to NixOS. Do not set
 `android.aapt2FromMavenOverride`; it was a NixOS-only workaround.
 
-Gyre targets Android API 37 only. It deliberately declares no network
+Paperouette targets Android API 37 only. It deliberately declares no network
 permission and includes no runtime HTTP client.
 
 ## Generate the catalogue

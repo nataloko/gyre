@@ -14,6 +14,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Gyre"
+rootProject.name = "Paperouette"
 include(":app")
 

@@ -1,3 +1,3 @@
 -keepattributes *Annotation*
--keep class dev.gyre.wallpaper.model.** { *; }
+-keep class dev.paperouette.wallpaper.model.** { *; }
 

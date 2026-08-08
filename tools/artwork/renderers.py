@@ -1,4 +1,4 @@
-"""Procedural renderers for Gyre's spinner families."""
+"""Procedural renderers for Paperouette's spinner families."""
 
 from __future__ import annotations
 

@@ -8,11 +8,11 @@
 # has no upload to delegate. The generated artwork is not committed at all; it is rebuilt from
 # tools/catalog/ and tools/artwork/ by tools/generate_catalog.py.
 #
-# Set GYRE_SKIP_VERIFY=1 to push without the checks — for a branch you know is broken, say.
+# Set PAPEROUETTE_SKIP_VERIFY=1 to push without the checks — for a branch you know is broken, say.
 
 set -e
 
-if [ -n "$GYRE_SKIP_VERIFY" ]; then
+if [ -n "$PAPEROUETTE_SKIP_VERIFY" ]; then
     exit 0
 fi
 
@@ -21,6 +21,6 @@ printf '%s\n' "pre-push: ./gradlew testDebugUnitTest lintDebug"
 if ! (cd "$root" && ./gradlew --quiet testDebugUnitTest lintDebug); then
     printf >&2 '\n%s\n%s\n\n' \
         "pre-push: tests or lint failed, so nothing was pushed." \
-        "Fix them, or push once with GYRE_SKIP_VERIFY=1 to override."
+        "Fix them, or push once with PAPEROUETTE_SKIP_VERIFY=1 to override."
     exit 1
 fi
