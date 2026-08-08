@@ -13,6 +13,10 @@ keystore.properties
 *.jks
 *.keystore
 
+# Machine-specific agent guidance: devices, local paths, where private material is kept.
+# The remote is public, so this stays local. See the note at the top of AGENTS.md.
+AGENTS.local.md
+
 dist/
 tools/__pycache__/
 tools/artwork/__pycache__/

@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+This remote is public, so this file describes the project and nothing else. Anything tied to the machine it is worked on — attached devices, paths outside the repository, where unpublishable material is kept — belongs in `AGENTS.local.md`, which is git-ignored. **Read it first if it exists**, and when something turns out to be local rather than general, write it there instead of here.
+
 ## Project Structure & Module Organization
 
 Design decisions that are easy to mistake for accidents are collected under **Deliberate choices** at the end of this file; keep that list current, because everything else here assumes them.
@@ -133,4 +135,4 @@ Everything here is a decision, not an accident. Each says what it costs as well 
 
 Never commit `gyre-release.jks`, `keystore.properties`, credentials, or any prebuilt APK. Do not add network permissions or runtime HTTP dependencies; the app must work fully offline. Importing does not change that: it reads local files through the system picker, declares no permission, and adds no component — `package_release.py` asserts empty `receiver` and `provider` sets, which is why the folder walk uses `DocumentsContract` directly rather than `androidx.documentfile`. Never commit artwork a user imported, or a pack built from artwork this repository does not license — the remote is public, so that material stays outside the working tree entirely. Never commit generated artwork either; it is a build product and the ignore rules say so. Preserve catalogue checksums, package identity `dev.gyre.wallpaper`, and API 37-only support.
 
-Because those files are ignored, **a clone is not a full copy of this project**. Moving it to another machine means carrying `gyre-release.jks` and `keystore.properties` across by hand — losing that key means Android refuses to upgrade every installed copy — along with `dist/` if you want it. The artwork itself needs no such care: it is generated, and `uv run tools/generate_catalog.py` will rebuild it byte for byte from `tools/catalog/`.
+Because those files are ignored, **a clone is not a full copy of this project**. Publishing an upgrade needs the original signing key, which is kept outside the repository and held by CI as repository secrets for tagged releases; lose it and Android refuses to update every installed copy. Where this machine keeps its copy is in `AGENTS.local.md`. The artwork needs no such care: it is generated, and `uv run tools/generate_catalog.py` rebuilds it from `tools/catalog/`.
