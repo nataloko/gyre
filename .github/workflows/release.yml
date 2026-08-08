@@ -1,0 +1,102 @@
+# Tagging v<versionName> builds the signed release and attaches it here.
+#
+# Unlike CI, this never restores the artwork from a cache. A release is rare and an APK is the one
+# artefact people install, so it is worth the twenty minutes to render the catalogue from the
+# definitions in the tagged commit and check it reproduced before signing anything.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
+
+jobs:
+  release:
+    name: Signed release
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # A tag is a claim about what the APK contains, so check it against the build before spending
+      # an hour proving it wrong. v1.5.0 must be versionName 1.5.0; v1.5.0-rc1 is a prerelease of it.
+      - name: Check the tag matches versionName
+        id: version
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)
+          tag="${GITHUB_REF_NAME#v}"
+          base="${tag%%-*}"
+          if [ "$base" != "$version" ]; then
+              echo "Tag $GITHUB_REF_NAME claims version $base, but app/build.gradle.kts says $version." >&2
+              exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$tag" != "$base" ]; then
+              echo "prerelease=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+              echo "prerelease=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      - name: Install the Android SDK packages
+        run: .github/install-android-sdk.sh
+
+      - name: Generate the catalogue
+        run: uv run tools/generate_catalog.py
+
+      - name: Check the rebuild reproduced byte for byte
+        run: git diff --exit-code -- app/src/main/assets/catalog
+
+      # The build refuses to fall back to the debug key, so without these the release simply fails.
+      - name: Write the signing configuration
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 -d > gyre-release.jks
+          {
+              printf 'storeFile=gyre-release.jks\n'
+              printf 'storePassword=%s\n' "$RELEASE_STORE_PASSWORD"
+              printf 'keyAlias=%s\n' "$RELEASE_KEY_ALIAS"
+              printf 'keyPassword=%s\n' "$RELEASE_KEY_PASSWORD"
+          } > keystore.properties
+
+      - run: ./gradlew --no-daemon assembleRelease
+
+      # Independent of the build: checks package identity, that no permission or extra component
+      # crept in, and that all 948 artwork files and the catalogue counts are really in the APK.
+      - name: Verify and package
+        run: uv run tools/package_release.py
+
+      - name: Remove the signing material
+        if: always()
+        run: shred -u gyre-release.jks keystore.properties 2>/dev/null || true
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+              --title "Gyre ${{ steps.version.outputs.version }}" \
+              --generate-notes \
+              ${{ steps.version.outputs.prerelease }} \
+              dist/Gyre-${{ steps.version.outputs.version }}-release.apk \
+              dist/SHA256SUMS

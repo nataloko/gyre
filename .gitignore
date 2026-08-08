@@ -1,0 +1,27 @@
+.gradle/
+.idea/
+*.iml
+local.properties
+**/build/
+.kotlin/
+
+# Prebuilt APKs stay local, wherever they came from.
+/*.apk
+
+# Release signing material must never be committed.
+keystore.properties
+*.jks
+*.keystore
+
+dist/
+tools/__pycache__/
+tools/artwork/__pycache__/
+
+# The artwork is a build product of tools/catalog/ and tools/artwork/, rebuilt byte
+# for byte by tools/generate_catalog.py. Only the manifests it writes alongside the
+# images are tracked, which is enough to check a rebuild reproduced them exactly.
+app/src/main/assets/artwork/
+app/src/androidTest/assets/previews/
+
+# Artwork this repository does not license. Keep it outside the working tree.
+packs/

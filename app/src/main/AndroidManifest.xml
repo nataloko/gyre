@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <permission
+        android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        tools:node="remove" />
+    <uses-permission
+        android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        tools:node="remove" />
+
+    <uses-feature
+        android:glEsVersion="0x00030000"
+        android:required="true" />
+    <uses-feature
+        android:name="android.hardware.sensor.gyroscope"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.sensor.rotation_vector"
+        android:required="false" />
+
+    <application
+        android:name=".GyreApplication"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="false"
+        android:theme="@style/Theme.Gyre">
+        <!--
+            The app lays itself out from one window and owns a live EGL context, so it handles
+            configuration changes rather than being recreated for them: a recreation disposes
+            GyrePreviewView, which rebuilds a thread, an EGL context and every decoded 2600x2600
+            layer. Compose still sees the new Configuration, so isSystemInDarkTheme() — and with it
+            the automatic dark variants — keeps following the system.
+
+            The stage is the wallpaper rather than a picture of it, so it has to be the shape the
+            wallpaper actually is. A live wallpaper's surface follows the launcher, which does not
+            turn with the device, and the artwork is square: framing it against a landscape stage
+            would crop a different part of the scene at a different zoom from the one on the home
+            screen. nosensor pins the app to the orientation the launcher gives the service, so
+            the two agree by construction. configChanges stays for the sake of large screens,
+            where the platform ignores the request and rotates the window anyway.
+
+            DiscouragedApi is suppressed knowingly, and only here. The advice behind it is that an
+            app should adapt to the shape it is given, which is exactly what this one cannot do:
+            the shape is not the app's to choose, it is the launcher's, and adapting to a second
+            one would mean showing artwork the home screen never shows. From API 36 the platform
+            ignores the request anyway wherever the smallest width reaches 600dp, so this asks for
+            nothing on the large screens the check is written to protect.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode|keyboardHidden"
+            android:exported="true"
+            android:screenOrientation="nosensor"
+            tools:ignore="DiscouragedApi">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".wallpaper.GyreWallpaperService"
+            android:description="@string/wallpaper_description"
+            android:exported="true"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper" />
+        </service>
+
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:ignore="MissingClass"
+            tools:node="remove" />
+
+    </application>
+
+</manifest>

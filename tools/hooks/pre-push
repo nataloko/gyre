@@ -1,0 +1,26 @@
+#!/bin/sh
+# Runs the checks AGENTS.md asks for before anything leaves the machine.
+#
+# These are the same checks CI runs on the push that follows, run early enough to be cheap: a
+# failure here costs seconds of waiting rather than a red run and a second push to fix it.
+#
+# Nothing in this repository is tracked with Git LFS, so unlike the hook Git LFS installs, this one
+# has no upload to delegate. The generated artwork is not committed at all; it is rebuilt from
+# tools/catalog/ and tools/artwork/ by tools/generate_catalog.py.
+#
+# Set GYRE_SKIP_VERIFY=1 to push without the checks — for a branch you know is broken, say.
+
+set -e
+
+if [ -n "$GYRE_SKIP_VERIFY" ]; then
+    exit 0
+fi
+
+root=$(git rev-parse --show-toplevel)
+printf '%s\n' "pre-push: ./gradlew testDebugUnitTest lintDebug"
+if ! (cd "$root" && ./gradlew --quiet testDebugUnitTest lintDebug); then
+    printf >&2 '\n%s\n%s\n\n' \
+        "pre-push: tests or lint failed, so nothing was pushed." \
+        "Fix them, or push once with GYRE_SKIP_VERIFY=1 to override."
+    exit 1
+fi

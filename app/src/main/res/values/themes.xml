@@ -1,0 +1,13 @@
+<resources>
+    <style name="Theme.Gyre" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <!--
+            statusBarColor and navigationBarColor used to sit here. Both are ignored from API 35,
+            and edge to edge is established by enableEdgeToEdge() in MainActivity instead.
+        -->
+        <item name="android:windowNoTitle">true</item>
+    </style>
+</resources>
+

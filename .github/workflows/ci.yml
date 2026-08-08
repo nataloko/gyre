@@ -1,0 +1,108 @@
+# Gyre's artwork is not in the repository. It is a build product of tools/catalog/ and
+# tools/artwork/, so this workflow generates it before it can package an APK — which is also what
+# proves the generators still reproduce, since a rebuild that drifted would change the tracked
+# manifests under app/src/main/assets/catalog/.
+#
+# Tests and lint do not need any of that: the manifests they read are tracked. They run as their
+# own job so a Kotlin change gets its answer in minutes rather than behind a render.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g
+
+jobs:
+  check:
+    name: Tests and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install the Android SDK packages
+        run: .github/install-android-sdk.sh
+
+      - run: ./gradlew --no-daemon testDebugUnitTest lintDebug
+
+      - name: Keep the reports from a failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore
+
+  apk:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+
+      # Rendering the catalogue is the long pole, so it is keyed on everything that can change what
+      # it renders. A hit means these images already came from exactly these inputs.
+      - name: Restore the generated artwork
+        id: artwork
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: app/src/main/assets/artwork
+          key: artwork-${{ hashFiles('tools/catalog/**', 'tools/artwork/**', 'tools/generate_catalog.py', 'tools/gyre_palette.py') }}
+
+      - name: Generate the catalogue
+        if: steps.artwork.outputs.cache-hit != 'true'
+        run: uv run tools/generate_catalog.py
+
+      # checksums.json holds the SHA-256 of all 948 generated images, so a clean diff here says the
+      # rebuild reproduced every one of them byte for byte.
+      - name: Check the rebuild reproduced byte for byte
+        if: steps.artwork.outputs.cache-hit != 'true'
+        run: git diff --exit-code -- app/src/main/assets/catalog
+
+      # Saved before the build, so a failure downstream does not cost another render on the retry.
+      - name: Save the generated artwork
+        if: steps.artwork.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: app/src/main/assets/artwork
+          key: artwork-${{ hashFiles('tools/catalog/**', 'tools/artwork/**', 'tools/generate_catalog.py', 'tools/gyre_palette.py') }}
+
+      - name: Install the Android SDK packages
+        run: .github/install-android-sdk.sh
+
+      - run: ./gradlew --no-daemon assembleDebug
+
+      - name: Publish the APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Gyre-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          # An APK is a zip already; compressing it again buys nothing and costs minutes.
+          compression-level: 0
+          if-no-files-found: error

@@ -1,0 +1,575 @@
+# The pieces. Each names a renderer family in tools/artwork/ and the layers it stacks;
+# the palettes and recipes that colour a family live beside its renderer, keyed by the
+# `palette` each variant states here.
+#
+# `source` is the layer's stable identity for seeding. It is never read as a path, and
+# must not change unless the artwork is intentionally regenerated with a new seed.
+#
+# `rotation` is how many seconds one full turn takes, signed: negative runs
+# anticlockwise. A layer without one is static, and a multi-layer piece's periods do
+# not divide each other so it never settles. `parallax` is the layer's parallaxScale.
+#
+# `scaler` is the remix's inputRotationScaler. MotionMath.SPIN_WRAP_TURNS = 4, and
+# BundledCatalogRepository refuses a catalogue where scaler x 4 is not a whole number
+# of turns, so only multiples of 0.25 are legal.
+
+# ---- The house piece ------------------------------------------------------------------------
+# First in the file because it is first in the collection: it is what a fresh install opens
+# on, so its tile is the one already carrying the selection ring when the sheet comes up.
+
+[[design]]
+id = "gyrestack"
+label = "Gyre Stack"
+family = "spinner_gyre"
+scaler = 0.25
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_gyre/background.webp"
+  parallax = 0.0
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_gyre/outer.png"
+  rotation = 420.0
+  parallax = 0.12
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_gyre/middle.png"
+  rotation = -300.0
+  parallax = 0.24
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_gyre/inner.png"
+  rotation = 180.0
+  parallax = 0.36
+
+  [[design.variant]]
+  slug = "house"
+  label = "House Colours"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "seaglass"
+  label = "Sea Glass"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "nightbloom"
+  label = "Night Bloom"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "verdigris"
+  label = "Verdigris"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "saffron"
+  label = "Saffron"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "ultramarine"
+  label = "Ultramarine"
+  palette = "5"
+
+# ---- Shaded spirals -------------------------------------------------------------------------
+
+[[design]]
+id = "afterglow"
+label = "Afterglow Vortex"
+family = "spinner_afterglow"
+scaler = 0.75
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_afterglow/0.webp"
+  rotation = 180.0
+  parallax = 0.4
+
+  [[design.variant]]
+  slug = "biolume"
+  label = "Bioluminescence"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "solar"
+  label = "Solar Kiss"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "ultraviolet"
+  label = "Ultraviolet"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "seaglass"
+  label = "Sea Glass"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "infrared"
+  label = "Infrared"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "moonmilk"
+  label = "Moonmilk"
+  palette = "5"
+
+[[design]]
+id = "taffy"
+label = "Velvet Taffy"
+family = "spinner_taffy"
+scaler = 0.75
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_taffy/0.webp"
+  rotation = -240.0
+  parallax = 0.35
+
+  [[design.variant]]
+  slug = "sorbet"
+  label = "Sorbet Parade"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "raspberry"
+  label = "Blue Raspberry"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "matcha"
+  label = "Matcha Cream"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "licorice"
+  label = "Licorice Pop"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "peach"
+  label = "Peach Fuzz"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "plum"
+  label = "Electric Plum"
+  palette = "5"
+
+[[design]]
+id = "prismata"
+label = "Prismata"
+family = "spinner_prismata"
+scaler = 0.5
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_prismata/0.webp"
+  rotation = 320.0
+  parallax = 0.3
+
+  [[design.variant]]
+  slug = "opal"
+  label = "Opal"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "obsidian"
+  label = "Obsidian Gold"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "emerald"
+  label = "Emerald"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "arctic"
+  label = "Arctic Glass"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "heatwave"
+  label = "Heatwave"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "vaporwave"
+  label = "Vaporwave"
+  palette = "5"
+
+# ---- Layered scenes -------------------------------------------------------------------------
+
+[[design]]
+id = "orbitgarden"
+label = "Orbit Garden"
+family = "spinner_orbitgarden"
+scaler = 0.5
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_orbitgarden/background.webp"
+  parallax = 0.0
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_orbitgarden/arcs.png"
+  rotation = 220.0
+  parallax = 0.18
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_orbitgarden/beads.png"
+  rotation = -310.0
+  parallax = 0.28
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_orbitgarden/threads.png"
+  rotation = 430.0
+  parallax = 0.38
+
+  [[design.variant]]
+  slug = "citrus"
+  label = "Midnight Citrus"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "rose"
+  label = "Cosmic Rose"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "deepsea"
+  label = "Deep Sea"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "papersun"
+  label = "Paper Sun"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "laserlime"
+  label = "Laser Lime"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "amethyst"
+  label = "Amethyst"
+  palette = "5"
+
+[[design]]
+id = "planetarium"
+label = "Pocket Planetarium"
+family = "spinner_planetarium"
+scaler = 0.25
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_planetarium/background.webp"
+  parallax = 0.0
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_planetarium/star.png"
+  parallax = 0.08
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_planetarium/inner_worlds.png"
+  rotation = 180.0
+  parallax = 0.18
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_planetarium/outer_worlds.png"
+  rotation = -360.0
+  parallax = 0.3
+
+  [[design.layer]]
+  source = "procedural/originals/spinner_planetarium/comets.png"
+  rotation = 520.0
+  parallax = 0.42
+
+  [[design.variant]]
+  slug = "golden"
+  label = "Golden Hour"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "reddwarf"
+  label = "Red Dwarf"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "binary"
+  label = "Binary Dream"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "cryo"
+  label = "Cryosphere"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "candy"
+  label = "Candy Cosmos"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "blacklight"
+  label = "Blacklight"
+  palette = "5"
+
+# ---- Generative systems ---------------------------------------------------------------------
+
+[[design]]
+id = "reactor"
+label = "Turing Reactor"
+family = "spinner_reactor"
+scaler = 0.5
+
+  [[design.layer]]
+  source = "procedural/outliers/spinner_reactor/0.webp"
+  rotation = 240.0
+  parallax = 0.42
+
+  [[design.variant]]
+  slug = "coral"
+  label = "Coral Bloom"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "excitable"
+  label = "Excitable Media"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "mitosis"
+  label = "Mitosis"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "labyrinth"
+  label = "Labyrinth"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "soliton"
+  label = "Soliton Rain"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "petri"
+  label = "Petri Rose"
+  palette = "5"
+
+[[design]]
+id = "strangeloop"
+label = "Strange Loop"
+family = "spinner_strangeloop"
+scaler = 0.5
+
+  [[design.layer]]
+  source = "procedural/outliers/spinner_strangeloop/0.webp"
+  rotation = -300.0
+  parallax = 0.36
+
+  [[design.variant]]
+  slug = "ghost"
+  label = "Ghost Orbit"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "ion"
+  label = "Ion Bloom"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "gilded"
+  label = "Gilded Chaos"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "jade"
+  label = "Jade Thread"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "ember"
+  label = "Ember Fold"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "violet"
+  label = "Violet Lattice"
+  palette = "5"
+
+[[design]]
+id = "quasicrystal"
+label = "Quasicrystal"
+family = "spinner_quasicrystal"
+scaler = 0.5
+
+  [[design.layer]]
+  source = "procedural/outliers/spinner_quasicrystal/lattice.webp"
+  rotation = 260.0
+  parallax = 0.08
+
+  [[design.layer]]
+  source = "procedural/outliers/spinner_quasicrystal/moire.png"
+  rotation = -175.0
+  parallax = 0.3
+
+  [[design.variant]]
+  slug = "penrose"
+  label = "Penrose Drift"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "sunset"
+  label = "Sunset Interference"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "deeplattice"
+  label = "Deep Lattice"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "terrace"
+  label = "Solar Terrace"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "fringe"
+  label = "Cryo Fringe"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "ultraviolet"
+  label = "Ultraviolet"
+  palette = "5"
+
+[[design]]
+id = "truchet"
+label = "Truchet Weave"
+family = "spinner_truchet"
+scaler = 0.5
+
+  [[design.layer]]
+  source = "procedural/outliers/spinner_truchet/weave.webp"
+  rotation = 300.0
+  parallax = 0.1
+
+  [[design.layer]]
+  source = "procedural/outliers/spinner_truchet/jewels.png"
+  rotation = -210.0
+  parallax = 0.32
+
+  [[design.variant]]
+  slug = "circuit"
+  label = "Circuit Weave"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "rope"
+  label = "Rope Mandala"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "neon"
+  label = "Neon Maze"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "kilim"
+  label = "Kilim"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "bamboo"
+  label = "Bamboo Loom"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "blueprint"
+  label = "Blueprint"
+  palette = "5"
+
+[[design]]
+id = "kleinian"
+label = "Indra's Nest"
+family = "spinner_kleinian"
+scaler = 0.25
+
+  [[design.layer]]
+  source = "procedural/outliers/spinner_kleinian/0.webp"
+  rotation = 420.0
+  parallax = 0.3
+
+  [[design.variant]]
+  slug = "indra"
+  label = "Indra's Pearls"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "trefoil"
+  label = "Trefoil Foam"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "gasket"
+  label = "Gilded Gasket"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "tidepool"
+  label = "Tidepool"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "ruby"
+  label = "Ruby Nest"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "frost"
+  label = "Frost Cathedral"
+  palette = "5"
+
+# Six regular {p, q} triangle groups, folded by reflections in Poincare geodesics. swirls2 gave
+# this one a scaler of 0.38, which is not a whole number of turns over the spin wrap; 0.25 is,
+# and suits a piece whose detail is finest exactly where a fast spin would smear it.
+[[design]]
+id = "circlelimit"
+label = "Infinite Menagerie"
+family = "spinner_circlelimit"
+scaler = 0.25
+
+  [[design.layer]]
+  source = "procedural/circle_limits/spinner_circlelimit/0.webp"
+  rotation = 420.0
+  parallax = 0.34
+
+  [[design.variant]]
+  slug = "nightflight"
+  label = "Night Flight"
+  palette = "0"
+
+  [[design.variant]]
+  slug = "angels"
+  label = "Scarlet Angels"
+  palette = "1"
+
+  [[design.variant]]
+  slug = "lizards"
+  label = "Garden Lizards"
+  palette = "2"
+
+  [[design.variant]]
+  slug = "nocturne"
+  label = "Violet Nocturne"
+  palette = "3"
+
+  [[design.variant]]
+  slug = "graphite"
+  label = "Graphite Tessellation"
+  palette = "4"
+
+  [[design.variant]]
+  slug = "reef"
+  label = "Cobalt Reef"
+  palette = "5"
