@@ -2,15 +2,18 @@
 
 [![CI](https://github.com/nataloko/gyre/actions/workflows/ci.yml/badge.svg)](https://github.com/nataloko/gyre/actions/workflows/ci.yml)
 
-Gyre is a fully offline Android 17 live wallpaper. Its layered, touch-responsive
-vortexes react to your hand, the phone's tilt, and the launcher.
+Gyre is a fully offline live wallpaper for Android 17, inspired in part by
+SwirlWalls — the wonderfully playful spinner wallpaper that now appears to be
+retired and is no longer available on Google Play. Gyre carries that idea in
+its own direction: layered, touch-responsive artwork that reacts to your hand,
+the phone's tilt, and the launcher.
 
-## Procedural artwork, all the way through
+## Artwork made from scratch
 
-**Every piece of Gyre's artwork is procedurally generated.** The app does not
-download images, use an online service, or depend on a pre-made art library.
-The complete collection can be recreated locally, byte for byte, from the
-definitions in `tools/catalog/` and the renderers in `tools/artwork/`.
+Every piece bundled with Gyre is procedurally generated. There are no downloads,
+online services, or stock-art libraries hiding behind it. The whole collection
+can be rebuilt locally from the definitions in `tools/catalog/` and the
+renderers in `tools/artwork/`.
 
 The catalogue contains 26 pieces and 352 variants:
 
@@ -22,34 +25,29 @@ The catalogue contains 26 pieces and 352 variants:
   and hyperbolic circle limits folded from Poincaré reflections.
 - Fourteen procedural spinner pieces and their effect variants.
 
-The generated layers are bundled with the app so it remains completely offline
-when installed. Each layer is a fully rendered colour image: the generators
-can shade, light, and composite effects that a simple colour ramp cannot
-describe. Colour variants therefore have their own generated pixels, while
-effect variants reuse unchanged layers by content address. The current artwork
-bundle is 950 files and about 124 MiB.
+The finished layers are bundled with the app, so it stays completely offline
+after installation. Each layer is a fully rendered colour image because the
+generators do more than a simple colour ramp can describe: they shade, light,
+and composite the artwork too. Colour variants therefore get their own pixels,
+while effect variants reuse any layers that have not changed. The current
+artwork bundle is 950 files and about 124 MiB.
 
-That bundle is not in this repository. It is a build product, so what a clone
-carries is the definitions and renderers that make it, and you run the
-generator once — see [Generate the catalogue](#generate-the-catalogue). The
-same command runs in CI, which is where the downloadable builds get their
-artwork.
+The bundle itself is not checked into this repository. A clone contains the
+recipes and the tools that make it; run the generator once to produce the
+images (see [Generate the catalogue](#generate-the-catalogue)). CI does the
+same when it makes a downloadable build.
 
-Every choice made by a generator comes from a seeded random number generator
-keyed by its catalogue identifiers. That is what makes a rebuild repeatable,
-and why those identifiers must not be renamed.
+Even the apparently random choices are repeatable. They come from seeded random
+number generators tied to catalogue identifiers, which is why those identifiers
+must not be renamed.
 
-Gyre was inspired in part by SwirlWalls' playful, touch-responsive spinner
-wallpapers.
+## Add your own artwork
 
-## Bringing your own artwork
-
-The bundled collection is everything the app ships with, but not everything it
-can show. **Import** in the collection sheet takes artwork from the phone's own
-storage — a folder or a zip — and adds it to the collection alongside the
+The bundled collection is only the starting point. Choose **Import** in the
+collection sheet to add a folder or zip from your phone alongside Gyre's own
 generated pieces.
 
-Two things can be imported, and the app works out which from the file itself:
+Gyre works out what you gave it:
 
 - **A pack**: a catalogue and its artwork, built by `tools/export_pack.py` from
   any Gyre asset tree and side-loaded onto the phone. Its checksums are verified
@@ -58,10 +56,11 @@ Two things can be imported, and the app works out which from the file itself:
   new piece, centre-cropped square so it turns, flicks and nudges like the rest
   of the collection.
 
-Imported artwork is copied into the app's own storage, so it survives the
-original being moved or deleted, and it is removed again from the header above
-the pieces it brought. Nothing is uploaded and no network permission exists;
-the system file picker is the only place Gyre asks for anything outside itself.
+Imported artwork is copied into the app's own storage, so moving or deleting
+the original will not break your wallpaper. You can remove an import again from
+the header above the pieces it added. Nothing is uploaded, and Gyre has no
+network permission; the system file picker is the only place it asks for
+anything outside itself.
 
 ## License
 
@@ -69,7 +68,7 @@ Gyre is licensed under the [Apache License 2.0](LICENSE). This covers the app,
 the procedural generators and catalogue definitions, and the artwork generated
 from them by `tools/generate_catalog.py`. See [NOTICE](NOTICE) for attribution.
 
-## Develop
+## Work on Gyre
 
 You need JDK 17, `uv`, and an Android SDK containing:
 
@@ -89,12 +88,12 @@ uv run tools/generate_catalog.py
 ./gradlew assembleDebug
 ```
 
-The first command is what a fresh clone cannot skip: the images it writes are
-not committed. It takes several minutes, and needs running again only when
-something under `tools/` changes. JVM tests and lint do not need it at all —
-the two manifests they read are tracked. Instrumentation tests need one more
-command, because `SceneRendererTest` compares against reference frames that are
-generated too:
+Do not skip the first command on a fresh clone: the images it creates are not
+committed. It takes several minutes, but you only need to run it again after
+something under `tools/` changes. JVM tests and lint read the two tracked
+manifests, so they do not need the generated images. Instrumentation tests do
+need one extra step because `SceneRendererTest` compares against generated
+reference frames:
 
 ```sh
 uv run tools/generate_catalog.py --fixtures app/src/androidTest/assets/previews
@@ -117,8 +116,8 @@ permission and includes no runtime HTTP client.
 
 ## Generate the catalogue
 
-The catalogue is a build product of the procedural definitions and renderers,
-which is why the images are not committed. Build the complete bundle with:
+The catalogue is built from the procedural definitions and renderers, rather
+than stored in Git. Generate the complete bundle with:
 
 ```sh
 uv run tools/generate_catalog.py
@@ -132,20 +131,18 @@ the same bytes, and the check that it did is:
 git diff --exit-code -- app/src/main/assets/catalog
 ```
 
-Those two manifests are the part of the catalogue that is tracked, and
-`checksums.json` holds the SHA-256 of every generated image. So a clean diff
-there is a complete statement that the rebuild reproduced all 948 of them, byte
-for byte.
+Only the two manifests are tracked. Because `checksums.json` contains the
+SHA-256 of every generated image, a clean diff confirms that all 948 images
+were reproduced byte for byte.
 
-That holds on one machine, not across machines. NumPy dispatches different SIMD
-kernels depending on the CPU, and the last-bit differences that follow
-occasionally change a quantised pixel, which changes that file's content
-address. Disabling AVX-512 on a single machine is enough to move about a tenth
-of the hashes. The pictures are the same — under 0.02% of pixels differ by more
-than a rounding step, and those sit on anti-aliasing boundaries — so the
-identifiers move while the artwork does not. CI therefore checks that the
-catalogue it rendered is well formed and legible, rather than that it matches
-the manifests committed from somewhere else.
+That byte-for-byte promise applies on the same machine, not between different
+CPUs. NumPy chooses different SIMD kernels for different hardware, and tiny
+rounding differences can change a pixel and therefore its content-addressed
+filename. Disabling AVX-512 alone moves about a tenth of the hashes. Visually,
+the results are the same: fewer than 0.02% of pixels differ by more than one
+rounding step, all around anti-aliased edges. CI therefore checks that its newly
+rendered catalogue is valid and legible instead of comparing hashes produced on
+another machine.
 
 The source definitions for pieces, layers, rotations, and variants are in:
 
@@ -179,9 +176,9 @@ needed only when a piece that test covers changes.
 
 ## Build a signed release
 
-Tagging a commit `v1.5.0` builds and signs the release on CI and attaches the
-APK and its checksum to a GitHub release, which is where installable builds
-come from. The rest of this section is the same thing by hand.
+Tagging a commit `v1.5.0` asks CI to build and sign the release, then attach the
+APK and its checksum to a GitHub release. That is where installable builds come
+from. To do the same thing locally:
 
 Create a persistent signing key once, then back up both generated signing files
 somewhere secure:
