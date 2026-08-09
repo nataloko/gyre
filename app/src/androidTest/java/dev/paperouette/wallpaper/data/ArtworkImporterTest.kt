@@ -5,11 +5,18 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
+import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,7 +57,7 @@ class ArtworkImporterTest {
         val pack = TestPacks.build(context)
         val importer = importer()
 
-        importer.start { ZipImportSource("fixture.zip") { pack.inputStream() } }
+        importer.start(ZipImportSource("fixture.zip") { pack.inputStream() })
         val finished = importer.awaitFinished()
 
         assertEquals(0, finished.skipped)
@@ -77,7 +84,7 @@ class ArtworkImporterTest {
         val catalogue = PaperouetteCatalogRepository(bundled, importer.imported, backgroundScope)
         val before = catalogue.current.value.designs
 
-        importer.start { ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() } }
+        importer.start(ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() })
         importer.awaitFinished()
         val after = catalogue.current.first { it.designs.size > before.size }
 
@@ -88,11 +95,11 @@ class ArtworkImporterTest {
     @Test
     fun theSamePackTwiceIsRecognisedRatherThanCopiedAgain() = runTest {
         val importer = importer()
-        importer.start { ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() } }
+        importer.start(ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() })
         importer.awaitFinished()
         importer.acknowledge()
 
-        importer.start { ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() } }
+        importer.start(ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() })
         val second = importer.awaitFailure()
 
         assertTrue(second, "already imported" in second)
@@ -103,15 +110,129 @@ class ArtworkImporterTest {
     fun aTamperedFileAbortsTheWholeImport() = runTest {
         val importer = importer()
 
-        importer.start {
-            ZipImportSource("fixture.zip") { TestPacks.build(context, corruptOneAsset = true).inputStream() }
-        }
+        importer.start(
+            ZipImportSource("fixture.zip") {
+                TestPacks.build(context, corruptOneAsset = true).inputStream()
+            },
+        )
         val failed = importer.awaitFailure()
 
         assertTrue(failed, "checksum" in failed)
         assertTrue(importer.imported.value.isEmpty())
         // Nothing half-written survives, under imports or staging.
         assertFalse(File(filesDir, "imports").listFiles().orEmpty().any { it.isDirectory })
+        assertTrue(File(filesDir, "imports.staging").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun aForgedPackIdentityIsRefusedBeforeStagingExists() = runTest {
+        val importer = importer()
+        val pack = TestPacks.build(
+            context,
+            transformManifest = { it.copy(packId = "0".repeat(16)) },
+        )
+
+        importer.start(ZipImportSource("forged.zip") { pack.inputStream() })
+        val failed = importer.awaitFailure()
+
+        assertTrue(failed, "identity" in failed)
+        assertFalse(File(filesDir, "imports.staging").exists())
+    }
+
+    @Test
+    fun copiedPicturesMustMatchTheirDeclaredDimensions() = runTest {
+        val importer = importer()
+        val pack = TestPacks.build(
+            context,
+            transformManifest = { manifest ->
+                manifest.copy(
+                    assets = manifest.assets.mapIndexed { index, asset ->
+                        if (index == 0) asset.copy(width = asset.width + 1) else asset
+                    },
+                )
+            },
+        )
+
+        importer.start(ZipImportSource("dimensions.zip") { pack.inputStream() })
+        val failed = importer.awaitFailure()
+
+        assertTrue(failed, "dimensions" in failed)
+        assertTrue(importer.imported.value.isEmpty())
+        assertTrue(File(filesDir, "imports.staging").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun metadataAndPictureStreamsStopAtTheirLimits() = runTest {
+        val manifestReads = CountingStream(4 * MEBIBYTE + COPY_BUFFER)
+        val manifestImporter = importer()
+        manifestImporter.start(
+            EntriesSource(
+                listOf(ImportSource.Entry(PackManifest.PATH, -1, manifestReads)),
+            ),
+        )
+        assertTrue("manifest is too large" in manifestImporter.awaitFailure())
+        assertTrue(manifestReads.read <= 4 * MEBIBYTE + COPY_BUFFER)
+
+        val emptyManifest = PackManifest(
+            formatVersion = 1,
+            name = "Large catalogue",
+            packId = "0123456789abcdef",
+            counts = PackCounts(0, 0, 0, 0),
+            totalBytes = 0,
+            assets = emptyList(),
+        )
+        val catalogueReads = CountingStream(8 * MEBIBYTE + COPY_BUFFER)
+        val catalogueImporter = importer()
+        catalogueImporter.start(
+            EntriesSource(
+                listOf(
+                    entry(PackManifest.PATH, Json.encodeToString(PackManifest.serializer(), emptyManifest)),
+                    ImportSource.Entry(PackManifest.CATALOGUE_PATH, -1, catalogueReads),
+                ),
+            ),
+        )
+        assertTrue("catalogue is too large" in catalogueImporter.awaitFailure())
+        assertTrue(catalogueReads.read <= 8 * MEBIBYTE + COPY_BUFFER)
+
+        val pictureReads = CountingStream(64 * MEBIBYTE + COPY_BUFFER)
+        val pictureImporter = importer()
+        pictureImporter.start(EntriesSource(listOf(ImportSource.Entry("huge.jpg", -1, pictureReads))))
+        assertTrue("picture" in pictureImporter.awaitFailure())
+        assertTrue(pictureReads.read <= 64 * MEBIBYTE + COPY_BUFFER)
+    }
+
+    @Test
+    fun simultaneousStartsAreRejectedInsteadOfQueued() = runTest {
+        val importer = importer()
+        val first = EntriesSource(emptyList())
+        val rejected = EntriesSource(emptyList())
+
+        assertTrue(importer.start(first))
+        assertFalse(importer.start(rejected))
+        assertTrue(rejected.closed)
+        importer.cancel()
+    }
+
+    @Test
+    fun cancellationClosesTheSourceAndCleansStaging() = runTest {
+        val importer = importer()
+        val entries = zipEntries(TestPacks.build(context))
+        val blocking = BlockingStream()
+        val source = EntriesSource(
+            entries.take(3) + ImportSource.Entry(entries[3].name, entries[3].size, blocking),
+        )
+
+        importer.start(source)
+        blocking.opened.await()
+        importer.cancel()
+        source.closedSignal.await()
+        blocking.closedSignal.await()
+        withTimeout(5_000) {
+            while (File(filesDir, "imports.staging").listFiles().orEmpty().isNotEmpty()) yield()
+        }
+
+        assertTrue(source.closed)
+        assertTrue(importer.imported.value.isEmpty())
         assertTrue(File(filesDir, "imports.staging").listFiles().orEmpty().isEmpty())
     }
 
@@ -124,9 +245,9 @@ class ArtworkImporterTest {
     fun anEntryTheManifestNeverDeclaredIsIgnored() = runTest {
         val importer = importer()
 
-        importer.start {
+        importer.start(
             ZipImportSource("fixture.zip") { TestPacks.build(context, smuggle = "unlisted.webp").inputStream() }
-        }
+        )
         importer.awaitFinished()
 
         val imported = importer.imported.value.single()
@@ -139,9 +260,9 @@ class ArtworkImporterTest {
     fun aTraversingEntryNameStopsTheImport() = runTest {
         val importer = importer()
 
-        importer.start {
+        importer.start(
             ZipImportSource("fixture.zip") { TestPacks.build(context, smuggle = "../../../evil.webp").inputStream() }
-        }
+        )
         val failed = importer.awaitFailure()
 
         assertTrue(failed, "not safe to open" in failed)
@@ -170,7 +291,7 @@ class ArtworkImporterTest {
             }
         }.toByteArray()
 
-        importer.start { ZipImportSource("holiday.zip") { notAPack.inputStream() } }
+        importer.start(ZipImportSource("holiday.zip") { notAPack.inputStream() })
         val failed = importer.awaitFailure()
 
         assertTrue(failed, "could be read as pictures" in failed)
@@ -189,7 +310,7 @@ class ArtworkImporterTest {
             }
         }.toByteArray()
 
-        importer.start { ZipImportSource("broken.zip") { broken.inputStream() } }
+        importer.start(ZipImportSource("broken.zip") { broken.inputStream() })
         val failed = importer.awaitFailure()
 
         assertTrue(failed, "manifest could not be read" in failed)
@@ -199,7 +320,7 @@ class ArtworkImporterTest {
     fun aPackTooLargeForTheDiskIsRefusedBeforeAnythingIsWritten() = runTest {
         val importer = ArtworkImporter(store, backgroundScope, usableSpace = { 1L })
 
-        importer.start { ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() } }
+        importer.start(ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() })
         val failed = importer.awaitFailure()
 
         assertTrue(failed, "space" in failed)
@@ -209,7 +330,7 @@ class ArtworkImporterTest {
     @Test
     fun removingAnImportTakesItsArtworkWithIt() = runTest {
         val importer = importer()
-        importer.start { ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() } }
+        importer.start(ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() })
         val finished = importer.awaitFinished()
 
         val directory = store.directoryFor(finished.importId)
@@ -238,7 +359,7 @@ class ArtworkImporterTest {
     @Test
     fun anImportSurvivesTheProcessThatMadeIt() = runTest {
         importer().let { first ->
-            first.start { ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() } }
+            first.start(ZipImportSource("fixture.zip") { TestPacks.build(context).inputStream() })
             first.awaitFinished()
         }
 
@@ -273,8 +394,77 @@ class ArtworkImporterTest {
             else -> throw AssertionError("import unexpectedly succeeded")
         }
 
+    private fun entry(name: String, json: String) =
+        ImportSource.Entry(name, json.length.toLong(), json.encodeToByteArray().inputStream())
+
+    private fun zipEntries(bytes: ByteArray): List<ImportSource.Entry> {
+        val entries = mutableListOf<ImportSource.Entry>()
+        ZipInputStream(bytes.inputStream()).use { zip ->
+            while (true) {
+                val next = zip.nextEntry ?: break
+                if (!next.isDirectory) {
+                    val data = zip.readBytes()
+                    entries += ImportSource.Entry(next.name, data.size.toLong(), data.inputStream())
+                }
+                zip.closeEntry()
+            }
+        }
+        return entries
+    }
+
+    private class EntriesSource(private val entries: List<ImportSource.Entry>) : ImportSource {
+        override val label = "Fixture"
+        var closed = false
+            private set
+        val closedSignal = CompletableDeferred<Unit>()
+
+        override fun forEachEntry(visit: (ImportSource.Entry) -> Unit) = entries.forEach(visit)
+
+        override fun close() {
+            if (closed) return
+            closed = true
+            entries.forEach { runCatching { it.stream.close() } }
+            closedSignal.complete(Unit)
+        }
+    }
+
+    private class CountingStream(private val length: Int) : InputStream() {
+        var read = 0
+            private set
+
+        override fun read(): Int = if (read++ < length) 0 else -1
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            if (read >= this.length) return -1
+            val count = minOf(length, this.length - read)
+            buffer.fill(0, offset, offset + count)
+            read += count
+            return count
+        }
+    }
+
+    private class BlockingStream : InputStream() {
+        val opened = CompletableDeferred<Unit>()
+        val closedSignal = CompletableDeferred<Unit>()
+
+        override fun read(): Int {
+            opened.complete(Unit)
+            runBlockingUntilClosed()
+            return -1
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int = read()
+
+        override fun close() {
+            closedSignal.complete(Unit)
+        }
+
+        private fun runBlockingUntilClosed() = runBlocking { closedSignal.await() }
+    }
+
     private companion object {
         const val GIGABYTE = 1024L * 1024 * 1024
-
+        const val MEBIBYTE = 1024 * 1024
+        const val COPY_BUFFER = 64 * 1024
     }
 }

@@ -78,7 +78,7 @@ class ImportedArtwork(val manifest: ImportManifest, val catalogue: CatalogSnapsh
 sealed interface ImportProgress {
     data object Idle : ImportProgress
 
-    data class Working(val label: String, val done: Int, val total: Int) : ImportProgress
+    data class Working(val label: String, val done: Int, val total: Int?) : ImportProgress
 
     data class Finished(
         val importId: String,

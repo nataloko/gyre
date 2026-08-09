@@ -258,6 +258,8 @@ fun PaperouetteApp(
                 onFavouritesOnly = { favouritesOnly = it },
                 onImportFile = onChooseFile,
                 onImportFolder = onChooseFolder,
+                onCancelImport = importer::cancel,
+                onDismissImport = importer::acknowledge,
                 onRemoveImport = { id -> scope.launch { importer.remove(id) } },
                 onSelectDesign = { piece ->
                     scope.launch { repository.selectDesign(piece.id, darkMode) }

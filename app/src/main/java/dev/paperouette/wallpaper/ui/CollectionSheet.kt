@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Sensors
@@ -337,6 +338,8 @@ fun CollectionBody(
     onFavouritesOnly: (Boolean) -> Unit,
     onImportFile: () -> Unit,
     onImportFolder: () -> Unit,
+    onCancelImport: () -> Unit,
+    onDismissImport: () -> Unit,
     onRemoveImport: (String) -> Unit,
     onSelectDesign: (Design) -> Unit,
     onSelectVariant: (Remix) -> Unit,
@@ -424,7 +427,12 @@ fun CollectionBody(
         // rather than behind whatever screen started it.
         if (importProgress !is ImportProgress.Idle) {
             item(span = { GridItemSpan(maxLineSpan) }, key = "import_progress") {
-                ImportStatus(importProgress, Modifier.padding(bottom = 10.dp))
+                ImportStatus(
+                    progress = importProgress,
+                    onCancel = onCancelImport,
+                    onDismiss = onDismissImport,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
             }
         }
 
@@ -608,15 +616,24 @@ private fun ArtworkThumbnail(
 /**
  * The one line an import gets.
  *
- * Determinate rather than a spinner: a 516-file pack takes long enough that "something is
- * happening" is not an answer to "how long". Failures say what went wrong in the same place,
- * since the sheet is where the user asked for the import.
+ * A pack is determinate because its manifest knows the complete file count. A folder is not — its
+ * walk and decode happen in one pass — so it reports pictures completed instead. Failures say what
+ * went wrong in the same place, since the sheet is where the user asked for the import.
  */
 @Composable
-private fun ImportStatus(progress: ImportProgress, modifier: Modifier = Modifier) {
+private fun ImportStatus(
+    progress: ImportProgress,
+    onCancel: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier.fillMaxWidth().testTag("import_status")) {
         val message = when (progress) {
-            is ImportProgress.Working -> "Importing ${progress.label} — ${progress.done} of ${progress.total}"
+            is ImportProgress.Working -> if (progress.total == null) {
+                "Importing ${progress.label} — ${plural(progress.done, "picture")}"
+            } else {
+                "Importing ${progress.label} — ${progress.done} of ${progress.total}"
+            }
             is ImportProgress.Finished -> if (progress.skipped > 0) {
                 "Imported ${progress.pieces} pieces; ${progress.skipped} could not be used"
             } else {
@@ -625,23 +642,41 @@ private fun ImportStatus(progress: ImportProgress, modifier: Modifier = Modifier
             is ImportProgress.Failed -> progress.reason
             ImportProgress.Idle -> ""
         }
-        Text(
-            message,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (progress is ImportProgress.Failed) {
-                MaterialTheme.colorScheme.error
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                message,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (progress is ImportProgress.Failed) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (progress is ImportProgress.Working || progress is ImportProgress.Failed) {
+                Spacer(Modifier.width(8.dp))
+                PaperouetteGhostAction(
+                    label = if (progress is ImportProgress.Working) "Cancel" else "Dismiss",
+                    icon = Icons.Outlined.Close,
+                    modifier = Modifier.testTag(
+                        if (progress is ImportProgress.Working) "cancel_import" else "dismiss_import",
+                    ),
+                    onClick = if (progress is ImportProgress.Working) onCancel else onDismiss,
+                )
+            }
+        }
         if (progress is ImportProgress.Working) {
             Spacer(Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { progress.done.toFloat() / progress.total.coerceAtLeast(1) },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (progress.total == null) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            } else {
+                LinearProgressIndicator(
+                    progress = { progress.done.toFloat() / progress.total.coerceAtLeast(1) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

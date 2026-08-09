@@ -48,9 +48,9 @@ class ImportUiTest {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             runBlocking {
                 clearImports()
-                application.importer.start {
+                application.importer.start(
                     ZipImportSource("Holiday.zip") { TestPacks.build(context).inputStream() }
-                }
+                )
                 val end = application.importer.progress.first {
                     it is ImportProgress.Finished || it is ImportProgress.Failed
                 }

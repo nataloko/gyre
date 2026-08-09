@@ -42,6 +42,8 @@ class ZipImportSource(
     private val open: () -> InputStream,
 ) : ImportSource {
     private var stream: ZipInputStream? = null
+    @Volatile
+    private var closed = false
 
     override fun forEachEntry(visit: (ImportSource.Entry) -> Unit) {
         val zip = ZipInputStream(open().buffered(BUFFER_BYTES)).also { stream = it }
@@ -69,6 +71,8 @@ class ZipImportSource(
     }
 
     override fun close() {
+        if (closed) return
+        closed = true
         stream?.close()
         stream = null
         // Where the picker's read grant is given back. The import outlives the activity that
@@ -98,12 +102,23 @@ class DocumentTreeImportSource(
     override val label: String,
     private val onClose: () -> Unit = {},
 ) : ImportSource {
+    @Volatile
+    private var stream: InputStream? = null
+    @Volatile
+    private var closed = false
+
     override fun forEachEntry(visit: (ImportSource.Entry) -> Unit) {
         val root = DocumentsContract.getTreeDocumentId(tree)
         walk(root, depth = 0, seen = Counter(), visit = visit)
     }
 
-    override fun close() = onClose()
+    override fun close() {
+        if (closed) return
+        closed = true
+        stream?.close()
+        stream = null
+        onClose()
+    }
 
     private class Counter(var files: Int = 0)
 
@@ -145,8 +160,13 @@ class DocumentTreeImportSource(
             seen.files++
             val document = DocumentsContract.buildDocumentUriUsingTree(tree, id)
             val name = displayName(document) ?: id
-            resolver.openInputStream(document)?.use { stream ->
-                visit(ImportSource.Entry(name, size, stream))
+            resolver.openInputStream(document)?.use { opened ->
+                stream = opened
+                try {
+                    visit(ImportSource.Entry(name, size, opened))
+                } finally {
+                    stream = null
+                }
             }
         }
         folders.forEach { walk(it, depth + 1, seen, visit) }

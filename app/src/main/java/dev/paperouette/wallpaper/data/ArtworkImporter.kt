@@ -1,12 +1,16 @@
 package dev.paperouette.wallpaper.data
 
+import android.graphics.BitmapFactory
 import dev.paperouette.wallpaper.model.Catalog
 import dev.paperouette.wallpaper.model.Design
 import dev.paperouette.wallpaper.model.Remix
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,7 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
@@ -46,7 +49,10 @@ class ArtworkImporter(
     val imported: StateFlow<List<ImportedArtwork>> = _imported.asStateFlow()
     val progress: StateFlow<ImportProgress> = _progress.asStateFlow()
 
+    @Volatile
     private var job: Job? = null
+    @Volatile
+    private var activeSource: ImportSource? = null
 
     init {
         // Before anything reads it: an interrupted import must not surface as a design whose
@@ -55,28 +61,48 @@ class ArtworkImporter(
         _imported.value = store.list()
     }
 
-    /** Starts an import, unless one is already running. */
-    fun start(source: () -> ImportSource) {
-        if (running.isLocked) return
-        job = scope.launch {
-            running.withLock {
-                try {
-                    val finished = withContext(Dispatchers.IO) { source().use(::import) }
-                    _imported.value = store.list()
-                    _progress.value = finished
-                } catch (error: ImportException) {
-                    _progress.value = ImportProgress.Failed(error.message.orEmpty())
-                } catch (error: Exception) {
-                    currentCoroutineContext().ensureActive()
-                    _progress.value = ImportProgress.Failed(
-                        error.message?.takeIf(String::isNotBlank) ?: "The import could not be read",
-                    )
-                }
+    /** Starts an import if the source was accepted immediately rather than queued. */
+    fun start(source: ImportSource): Boolean {
+        if (!running.tryLock()) {
+            source.close()
+            return false
+        }
+        activeSource = source
+        val launched = scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                val finished = withContext(Dispatchers.IO) { source.use(::import) }
+                _imported.value = store.list()
+                _progress.value = finished
+            } catch (_: CancellationException) {
+                // Cancel is an explicit user action. The source and staging area close in their
+                // respective finally blocks, and Idle was already published by cancel().
+            } catch (error: ImportException) {
+                currentCoroutineContext().ensureActive()
+                _progress.value = ImportProgress.Failed(error.message.orEmpty())
+            } catch (error: Exception) {
+                currentCoroutineContext().ensureActive()
+                _progress.value = ImportProgress.Failed(
+                    error.message?.takeIf(String::isNotBlank) ?: "The import could not be read",
+                )
+            } finally {
+                activeSource = null
+                job = null
+                running.unlock()
             }
         }
+        job = launched
+        if (!launched.start()) {
+            activeSource = null
+            job = null
+            source.close()
+            running.unlock()
+            return false
+        }
+        return true
     }
 
     fun cancel() {
+        activeSource?.close()
         job?.cancel()
         job = null
         _progress.value = ImportProgress.Idle
@@ -94,14 +120,14 @@ class ArtworkImporter(
 
     /** Reads whatever was picked, deciding what it is from its first entry. */
     private fun import(source: ImportSource): ImportProgress.Finished = store.staged { staging ->
-        val artwork = File(staging, "artwork").apply { mkdirs() }
         var collector: Collector? = null
         var seen = 0
         source.forEachEntry { entry ->
+            ensureRunning()
             seen++
             if (seen > MAX_ENTRIES) throw ImportException("That archive holds too many files")
             val current = collector ?: newCollector(entry, source.label).also { collector = it }
-            current.accept(entry, artwork)
+            current.accept(entry, staging)
         }
         val finished = collector ?: throw ImportException("There was nothing in that to import")
         finished.finish(staging)
@@ -116,9 +142,9 @@ class ArtworkImporter(
 
     /** One pass over the entries, then whatever it has gathered written into the staging area. */
     private interface Collector {
-        fun accept(entry: ImportSource.Entry, artwork: File)
+        fun accept(entry: ImportSource.Entry, staging: () -> File)
 
-        fun finish(staging: File): ImportProgress.Finished
+        fun finish(staging: () -> File): ImportProgress.Finished
     }
 
     /**
@@ -135,7 +161,7 @@ class ArtworkImporter(
         private val stored = mutableSetOf<String>()
         private var bytes = 0L
 
-        override fun accept(entry: ImportSource.Entry, artwork: File) {
+        override fun accept(entry: ImportSource.Entry, staging: () -> File) {
             val pack = manifest
             when {
                 pack == null -> manifest = acceptManifest(entry)
@@ -143,14 +169,19 @@ class ArtworkImporter(
                 else -> {
                     val declared = pack.assetsByPath[entry.name] ?: return
                     val name = declared.path.removePrefix(ARTWORK_PREFIX)
-                    bytes += copyVerified(entry.stream, File(artwork, name), declared)
-                    stored += name
+                    if (!stored.add(name)) {
+                        throw ImportException("That pack contains the same file twice")
+                    }
+                    val artwork = File(staging(), "artwork").apply { mkdirs() }
+                    val destination = File(artwork, name)
+                    bytes = Math.addExact(bytes, copyVerified(entry.stream, destination, declared))
+                    verifyDimensions(destination, declared)
                     report(pack.name, stored.size, pack.counts.assets)
                 }
             }
         }
 
-        override fun finish(staging: File): ImportProgress.Finished {
+        override fun finish(staging: () -> File): ImportProgress.Finished {
             // The collector only exists because the first entry was the manifest, and reading
             // it either succeeded or threw, so this cannot be null by the time finish runs.
             val pack = requireNotNull(manifest) { "Pack collector finished without a manifest" }
@@ -159,6 +190,9 @@ class ArtworkImporter(
                 throw ImportException(
                     "That pack is incomplete — ${stored.size} of ${pack.counts.assets} files",
                 )
+            }
+            if (bytes != pack.totalBytes) {
+                throw ImportException("That pack's copied size disagrees with its manifest")
             }
             val sizes = pack.assets.associate {
                 it.path.removePrefix(ARTWORK_PREFIX) to (it.width to it.height)
@@ -173,7 +207,7 @@ class ArtworkImporter(
                 throw ImportException("Nothing in that pack could be used")
             }
             return commit(
-                staging = staging,
+                staging = staging(),
                 snapshot = result.snapshot,
                 manifest = ImportManifest(
                     id = pack.packId,
@@ -202,7 +236,7 @@ class ArtworkImporter(
         private var skipped = 0
         private var bytes = 0L
 
-        override fun accept(entry: ImportSource.Entry, artwork: File) {
+        override fun accept(entry: ImportSource.Entry, staging: () -> File) {
             if (images.size >= MAX_IMAGES) {
                 skipped++
                 return
@@ -210,9 +244,11 @@ class ArtworkImporter(
             if (usableSpace() < HEADROOM_BYTES) {
                 throw ImportException("Not enough space to import any more")
             }
-            // Read whole rather than streamed: the decoder needs the header before it knows what
-            // to scale to, and every one of these is bounded by MAX_IMAGE_BYTES anyway.
-            val raw = entry.stream.readBoundedBytes()
+            val raw = entry.stream.readBoundedBytes(
+                MAX_IMAGE_BYTES,
+                "One of those pictures is too large to import",
+            )
+            ensureRunning()
             val normalised = ImageNormaliser.normalise(raw)
             if (normalised == null) {
                 // Not an image, or one this device cannot decode. Counted and carried on from:
@@ -220,6 +256,8 @@ class ArtworkImporter(
                 skipped++
                 return
             }
+            ensureRunning()
+            val artwork = File(staging(), "artwork").apply { mkdirs() }
             val masterFile = write(artwork, normalised.master)
             val thumbFile = write(artwork, normalised.thumb)
             bytes += normalised.master.size + normalised.thumb.size
@@ -230,10 +268,10 @@ class ArtworkImporter(
                 palette = normalised.palette,
                 isDark = normalised.isDark,
             )
-            report(sourceLabel, images.size, 0)
+            report(sourceLabel, images.size, null)
         }
 
-        override fun finish(staging: File): ImportProgress.Finished {
+        override fun finish(staging: () -> File): ImportProgress.Finished {
             if (images.isEmpty()) {
                 throw ImportException(
                     if (skipped > 0) "None of those files could be read as pictures"
@@ -247,7 +285,7 @@ class ArtworkImporter(
             val label = SynthesisedCatalog.labelFor(sourceLabel)
             val snapshot = SynthesisedCatalog.forImages(importId, label, images)
             return commit(
-                staging = staging,
+                staging = staging(),
                 snapshot = snapshot,
                 manifest = ImportManifest(
                     id = importId,
@@ -269,16 +307,8 @@ class ArtworkImporter(
             val file = File(artwork, name)
             if (!file.exists()) file.writeBytes(data)
             return name
-        }
-
-        private fun InputStream.readBoundedBytes(): ByteArray {
-            val bytes = readBytes()
-            if (bytes.size > MAX_IMAGE_BYTES) {
-                throw ImportException("One of those pictures is too large to import")
-            }
-            return bytes
-        }
     }
+}
 
     /** Writes the catalogue and manifest, then publishes the staging directory. */
     private fun commit(
@@ -300,10 +330,12 @@ class ArtworkImporter(
     /** The first entry, which must be the manifest and must be affordable. */
     private fun acceptManifest(entry: ImportSource.Entry): PackManifest {
         val manifest = readManifest(entry.stream)
+        ImportedPackValidator.validateManifest(manifest)
         if (store.contains(manifest.packId)) {
             throw ImportException("${manifest.name} is already imported")
         }
-        if (usableSpace() < manifest.totalBytes + HEADROOM_BYTES) {
+        val available = usableSpace()
+        if (available < HEADROOM_BYTES || manifest.totalBytes > available - HEADROOM_BYTES) {
             throw ImportException(
                 "Not enough space — this needs ${manifest.totalBytes / 1024 / 1024} MB",
             )
@@ -315,33 +347,30 @@ class ArtworkImporter(
         if (entry.name != PackManifest.CATALOGUE_PATH) {
             throw ImportException("That pack has no catalogue")
         }
-        return readCatalogue(entry.stream, manifest)
+        val bytes = entry.stream.readBoundedBytes(
+            MAX_CATALOGUE_BYTES,
+            "That pack's catalogue is too large to read",
+        )
+        val catalogue = readCatalogue(bytes)
+        ImportedPackValidator.validateCatalogue(catalogue, manifest)
+        ImportedPackValidator.requireIdentity(manifest, bytes)
+        return catalogue
     }
 
     private fun readManifest(stream: InputStream): PackManifest {
+        val bytes = stream.readBoundedBytes(
+            MAX_MANIFEST_BYTES,
+            "That pack's manifest is too large to read",
+        )
         val manifest = runCatching {
-            JSON.decodeFromString<PackManifest>(stream.readBytes().decodeToString())
+            JSON.decodeFromString<PackManifest>(bytes.decodeToString())
         }.getOrElse { throw ImportException("That pack's manifest could not be read") }
-        if (manifest.formatVersion != PackManifest.SUPPORTED_VERSION) {
-            throw ImportException("That pack needs a newer version of Paperouette")
-        }
-        if (manifest.assets.size != manifest.counts.assets) {
-            throw ImportException("That pack's manifest disagrees with itself")
-        }
         return manifest
     }
 
-    private fun readCatalogue(stream: InputStream, manifest: PackManifest): Catalog {
-        val catalogue = runCatching {
-            JSON.decodeFromString<Catalog>(stream.readBytes().decodeToString())
+    private fun readCatalogue(bytes: ByteArray): Catalog = runCatching {
+        JSON.decodeFromString<Catalog>(bytes.decodeToString())
         }.getOrElse { throw ImportException("That pack's catalogue could not be read") }
-        if (catalogue.designs.size != manifest.counts.designs ||
-            catalogue.remixes.size != manifest.counts.remixes
-        ) {
-            throw ImportException("That pack's catalogue disagrees with its manifest")
-        }
-        return catalogue
-    }
 
     /**
      * Copies one declared asset, refusing it the moment it stops matching what was promised.
@@ -350,14 +379,12 @@ class ArtworkImporter(
      * delivers a gigabyte is stopped at the limit instead of after it.
      */
     private fun copyVerified(stream: InputStream, destination: File, declared: PackAsset): Long {
-        if (declared.bytes > MAX_ASSET_BYTES) {
-            throw ImportException("That pack holds a file too large to import")
-        }
         val digest = MessageDigest.getInstance("SHA-256")
         var copied = 0L
         destination.outputStream().use { output ->
             val buffer = ByteArray(COPY_BUFFER_BYTES)
             while (true) {
+                ensureRunning()
                 val read = stream.read(buffer)
                 if (read <= 0) break
                 copied += read
@@ -375,6 +402,36 @@ class ArtworkImporter(
         return copied
     }
 
+    private fun verifyDimensions(file: File, declared: PackAsset) {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.path, bounds)
+        if (bounds.outWidth != declared.width || bounds.outHeight != declared.height) {
+            throw ImportException("${declared.path} does not match its declared dimensions")
+        }
+    }
+
+    private fun InputStream.readBoundedBytes(limit: Int, tooLarge: String): ByteArray {
+        val output = ByteArrayOutputStream(minOf(limit, initialBufferSize(this)))
+        val buffer = ByteArray(COPY_BUFFER_BYTES)
+        var total = 0
+        while (true) {
+            ensureRunning()
+            val read = read(buffer)
+            if (read <= 0) break
+            if (read > limit - total) throw ImportException(tooLarge)
+            output.write(buffer, 0, read)
+            total += read
+        }
+        return output.toByteArray()
+    }
+
+    private fun initialBufferSize(stream: InputStream): Int =
+        runCatching { stream.available().coerceIn(32, COPY_BUFFER_BYTES) }.getOrDefault(32)
+
+    private fun ensureRunning() {
+        if (job?.isActive != true) throw CancellationException("Import cancelled")
+    }
+
     /** An import's identity, derived from what it holds so the same input is recognised again. */
     private fun identity(fileNames: List<String>): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -382,10 +439,10 @@ class ArtworkImporter(
         return digest.digest().toHex().take(IMPORT_ID_LENGTH)
     }
 
-    private fun report(label: String, done: Int, total: Int) {
+    private fun report(label: String, done: Int, total: Int?) {
         // At most one emission every REPORT_EVERY files: a 516-file pack would otherwise push
         // five hundred states through a flow that draws one line of text.
-        if (done % REPORT_EVERY == 0 || done == total) {
+        if (done == 1 || done % REPORT_EVERY == 0 || done == total) {
             _progress.value = ImportProgress.Working(label, done, total)
         }
     }
@@ -396,8 +453,9 @@ class ArtworkImporter(
         const val ARTWORK_PREFIX = "artwork/"
         const val MAX_ENTRIES = 5_000
         const val MAX_IMAGES = 200
-        const val MAX_ASSET_BYTES = 64L * 1024 * 1024
         const val MAX_IMAGE_BYTES = 64 * 1024 * 1024
+        const val MAX_MANIFEST_BYTES = 4 * 1024 * 1024
+        const val MAX_CATALOGUE_BYTES = 8 * 1024 * 1024
         const val HEADROOM_BYTES = 32L * 1024 * 1024
         const val COPY_BUFFER_BYTES = 64 * 1024
         const val REPORT_EVERY = 8

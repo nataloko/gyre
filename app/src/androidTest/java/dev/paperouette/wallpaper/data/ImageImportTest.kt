@@ -52,13 +52,13 @@ class ImageImportTest {
     fun aFolderOfPicturesBecomesOnePieceWithAVariantEach() = runTest {
         val importer = importer()
 
-        importer.start {
+        importer.start(
             zipOf(
                 "Sunset.jpg" to photo(1600, 900, Color.rgb(230, 120, 20)),
                 "Moss.png" to photo(900, 1600, Color.rgb(40, 160, 90)),
                 "notes.txt" to "not a picture".toByteArray(),
-            )
-        }
+            ),
+        )
         val finished = importer.awaitFinished()
 
         assertEquals(1, finished.pieces)
@@ -75,7 +75,7 @@ class ImageImportTest {
     fun everyImportedPictureIsSquareAndWithinTheRenderersLimit() = runTest {
         val importer = importer()
         // Short edge above the master edge, so the cap is what decides the result.
-        importer.start { zipOf("Wide.jpg" to photo(3600, 2400, Color.rgb(200, 40, 90))) }
+        importer.start(zipOf("Wide.jpg" to photo(3600, 2400, Color.rgb(200, 40, 90))))
         importer.awaitFinished()
 
         val remix = importer.imported.value.single().catalogue.remixes.single()
@@ -93,7 +93,7 @@ class ImageImportTest {
     @Test
     fun aPictureSmallerThanTheMasterEdgeIsNotEnlarged() = runTest {
         val importer = importer()
-        importer.start { zipOf("Tiny.png" to photo(400, 300, Color.rgb(20, 40, 200))) }
+        importer.start(zipOf("Tiny.png" to photo(400, 300, Color.rgb(20, 40, 200))))
         importer.awaitFinished()
 
         val remix = importer.imported.value.single().catalogue.remixes.single()
@@ -104,7 +104,7 @@ class ImageImportTest {
     @Test
     fun anImportedPictureCarriesAPaletteAndATone() = runTest {
         val importer = importer()
-        importer.start { zipOf("Orange.jpg" to photo(800, 800, Color.rgb(230, 120, 20))) }
+        importer.start(zipOf("Orange.jpg" to photo(800, 800, Color.rgb(230, 120, 20))))
         importer.awaitFinished()
 
         val remix = importer.imported.value.single().catalogue.remixes.single()
@@ -118,7 +118,7 @@ class ImageImportTest {
     @Test
     fun anImportedPictureObeysTheSpinWrapPeriod() = runTest {
         val importer = importer()
-        importer.start { zipOf("Spin.png" to photo(600, 600, Color.rgb(90, 200, 160))) }
+        importer.start(zipOf("Spin.png" to photo(600, 600, Color.rgb(90, 200, 160))))
         importer.awaitFinished()
 
         assertTrue(
@@ -131,11 +131,11 @@ class ImageImportTest {
     @Test
     fun theSamePicturesTwiceAreRecognisedRatherThanCopiedAgain() = runTest {
         val importer = importer()
-        importer.start { zipOf("A.png" to photo(500, 500, Color.rgb(10, 90, 200))) }
+        importer.start(zipOf("A.png" to photo(500, 500, Color.rgb(10, 90, 200))))
         importer.awaitFinished()
         importer.acknowledge()
 
-        importer.start { zipOf("A.png" to photo(500, 500, Color.rgb(10, 90, 200))) }
+        importer.start(zipOf("A.png" to photo(500, 500, Color.rgb(10, 90, 200))))
         val failed = importer.awaitFailure()
 
         assertTrue(failed, "already imported" in failed)
@@ -146,7 +146,7 @@ class ImageImportTest {
     fun aZipHoldingNoPicturesSaysSoRatherThanCommittingNothing() = runTest {
         val importer = importer()
 
-        importer.start { zipOf("notes.txt" to "nothing here".toByteArray()) }
+        importer.start(zipOf("notes.txt" to "nothing here".toByteArray()))
         val failed = importer.awaitFailure()
 
         assertTrue(failed, "pictures" in failed)
@@ -156,12 +156,12 @@ class ImageImportTest {
     @Test
     fun everyImportedFileLandsWhereItsCatalogueSaysItDoes() = runTest {
         val importer = importer()
-        importer.start {
+        importer.start(
             zipOf(
                 "One.jpg" to photo(2400, 1600, Color.rgb(200, 90, 40)),
                 "Two.png" to photo(700, 700, Color.rgb(40, 90, 200)),
-            )
-        }
+            ),
+        )
         importer.awaitFinished()
 
         importer.imported.value.single().catalogue.remixes.forEach { remix ->
@@ -186,12 +186,12 @@ class ImageImportTest {
         val importer = application.importer
         val before = importer.imported.value.map { it.manifest.id }.toSet()
         try {
-            importer.start {
+            importer.start(
                 zipOf(
                     "One.jpg" to photo(2400, 1600, Color.rgb(200, 90, 40)),
                     "Two.png" to photo(700, 700, Color.rgb(40, 90, 200)),
-                )
-            }
+                ),
+            )
             val finished = importer.awaitFinished()
             val imported = importer.imported.value.single { it.manifest.id == finished.importId }
 

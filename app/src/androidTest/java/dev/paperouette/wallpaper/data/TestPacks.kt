@@ -26,6 +26,8 @@ object TestPacks {
         context: Context,
         corruptOneAsset: Boolean = false,
         smuggle: String? = null,
+        transformManifest: (PackManifest) -> PackManifest = { it },
+        transformCatalogue: (Catalog) -> Catalog = { it },
     ): ByteArray {
         val bundled = Json { ignoreUnknownKeys = true }
             .decodeFromString<Catalog>(
@@ -33,13 +35,15 @@ object TestPacks {
             )
         val design = bundled.designs.first { it.remixIds.size >= 2 }
         val remixes = design.remixIds.take(2).map { id -> bundled.remixes.first { it.id == id } }
-        val subset = Catalog(
-            designIds = listOf(design.id),
-            remixIds = remixes.map { it.id },
-            designs = listOf(
-                design.copy(remixIds = remixes.map { it.id }, previewRemixId = remixes.first().id),
+        val subset = transformCatalogue(
+            Catalog(
+                designIds = listOf(design.id),
+                remixIds = remixes.map { it.id },
+                designs = listOf(
+                    design.copy(remixIds = remixes.map { it.id }, previewRemixId = remixes.first().id),
+                ),
+                remixes = remixes,
             ),
-            remixes = remixes,
         )
         val paths = remixes.flatMap { remix ->
             remix.layers.map { it.imageUrl } + remix.previews.thumb
@@ -48,31 +52,34 @@ object TestPacks {
         val blobs = paths.associateWith { path ->
             context.assets.open(path.removePrefix("assets/")).use { it.readBytes() }
         }
-        val manifest = PackManifest(
-            formatVersion = PackManifest.SUPPORTED_VERSION,
-            name = "Fixture",
-            packId = FIXTURE_PACK_ID,
-            counts = PackCounts(
-                designs = 1,
-                remixes = remixes.size,
-                layers = remixes.sumOf { it.layers.size },
-                assets = paths.size,
-            ),
-            totalBytes = blobs.values.sumOf { it.size }.toLong(),
-            assets = paths.map { path ->
-                val data = blobs.getValue(path)
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
-                PackAsset(
-                    path = "artwork/${path.removePrefix("assets/artwork/")}",
-                    sha256 = sha256(data),
-                    bytes = data.size.toLong(),
-                    width = bounds.outWidth,
-                    height = bounds.outHeight,
-                )
-            },
-        )
         val catalogueJson = Json.encodeToString(Catalog.serializer(), subset)
+        val assets = paths.map { path ->
+            val data = blobs.getValue(path)
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+            PackAsset(
+                path = "artwork/${path.removePrefix("assets/artwork/")}",
+                sha256 = sha256(data),
+                bytes = data.size.toLong(),
+                width = bounds.outWidth,
+                height = bounds.outHeight,
+            )
+        }
+        val manifest = transformManifest(
+            PackManifest(
+                formatVersion = PackManifest.SUPPORTED_VERSION,
+                name = "Fixture",
+                packId = identity(assets, catalogueJson),
+                counts = PackCounts(
+                    designs = subset.designs.size,
+                    remixes = subset.remixes.size,
+                    layers = subset.remixes.sumOf { it.layers.size },
+                    assets = paths.size,
+                ),
+                totalBytes = blobs.values.sumOf { it.size }.toLong(),
+                assets = assets,
+            ),
+        )
 
         return ByteArrayOutputStream().also { buffer ->
             ZipOutputStream(buffer).use { zip ->
@@ -101,7 +108,10 @@ object TestPacks {
     private fun sha256(data: ByteArray) =
         MessageDigest.getInstance("SHA-256").digest(data).joinToString("") { "%02x".format(it) }
 
-
-    /** Constant, so the same fixture built twice is recognised as the same pack. */
-    const val FIXTURE_PACK_ID = "fixture000000001"
+    private fun identity(assets: List<PackAsset>, catalogueJson: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        assets.forEach { digest.update(it.sha256.encodeToByteArray()) }
+        digest.update(catalogueJson.encodeToByteArray())
+        return digest.digest().joinToString("") { "%02x".format(it) }.take(16)
+    }
 }

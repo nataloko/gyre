@@ -51,23 +51,29 @@ class ImportStore(private val filesDir: File) {
         .mapNotNull(::read)
         .sortedBy { it.manifest.importedAt }
 
-    fun contains(importId: String): Boolean = readManifest(File(root, importId)) != null
+    fun contains(importId: String): Boolean = readManifest(directoryFor(importId)) != null
 
-    fun directoryFor(importId: String): File = File(root, importId)
+    fun directoryFor(importId: String): File = childOf(root, importId)
 
     /**
-     * Runs [block] against a fresh staging directory, deleting it however [block] ends.
+     * Gives [block] a way to acquire a fresh staging directory, deleting it however [block] ends.
+     * It is created lazily so a pack's metadata can be validated before the filesystem changes.
      *
      * Commit is [block]'s job: it moves the directory into place with [commit], and anything it
      * leaves behind is debris by definition.
      */
-    fun <T> staged(block: (File) -> T): T {
-        val directory = File(staging, UUID.randomUUID().toString())
-        check(directory.mkdirs()) { "Cannot create a staging directory" }
+    fun <T> staged(block: (acquire: () -> File) -> T): T {
+        var directory: File? = null
+        val acquire = {
+            directory ?: childOf(staging, UUID.randomUUID().toString()).also {
+                check(it.mkdirs()) { "Cannot create a staging directory" }
+                directory = it
+            }
+        }
         return try {
-            block(directory)
+            block(acquire)
         } finally {
-            directory.deleteRecursively()
+            directory?.deleteRecursively()
         }
     }
 
@@ -78,8 +84,9 @@ class ImportStore(private val filesDir: File) {
      * be seen before the artwork it counts.
      */
     fun commit(staged: File, importId: String) {
+        requireContained(staged, staging)
         root.mkdirs()
-        val destination = File(root, importId)
+        val destination = directoryFor(importId)
         destination.deleteRecursively()
         check(staged.renameTo(destination)) { "Cannot publish the import" }
     }
@@ -92,19 +99,22 @@ class ImportStore(private val filesDir: File) {
      * artwork that is half deleted.
      */
     fun remove(importId: String) {
-        val directory = File(root, importId)
+        val directory = directoryFor(importId)
         if (!directory.isDirectory) return
         staging.mkdirs()
-        val discarded = File(staging, "removed-${UUID.randomUUID()}")
+        val discarded = childOf(staging, "removed-${UUID.randomUUID()}")
         if (directory.renameTo(discarded)) discarded.deleteRecursively() else directory.deleteRecursively()
     }
 
     fun writeManifest(directory: File, manifest: ImportManifest) {
+        requireContained(directory, staging)
+        require(manifest.id.matches(IMPORT_ID)) { "Invalid import id" }
         File(directory, ImportManifest.PATH)
             .writeText(JSON.encodeToString(ImportManifest.serializer(), manifest))
     }
 
     fun writeCatalogue(directory: File, catalogue: Catalog) {
+        requireContained(directory, staging)
         File(directory, ImportManifest.CATALOGUE_PATH)
             .writeText(JSON.encodeToString(Catalog.serializer(), catalogue))
     }
@@ -128,10 +138,30 @@ class ImportStore(private val filesDir: File) {
     }
 
     private fun readManifest(directory: File): ImportManifest? = runCatching {
+        requireContained(directory, root)
         JSON.decodeFromString<ImportManifest>(File(directory, ImportManifest.PATH).readText())
-    }.getOrNull()?.takeIf { it.formatVersion == ImportManifest.SUPPORTED_VERSION }
+    }.getOrNull()?.takeIf {
+        it.formatVersion == ImportManifest.SUPPORTED_VERSION &&
+            it.id == directory.name &&
+            it.id.matches(IMPORT_ID)
+    }
+
+    private fun childOf(parent: File, name: String): File {
+        require(name.matches(IMPORT_ID) || name.matches(STAGING_NAME)) { "Invalid import path" }
+        return File(parent, name).also { requireContained(it, parent) }
+    }
+
+    private fun requireContained(file: File, parent: File) {
+        val rootPath = parent.canonicalFile.toPath()
+        val filePath = file.canonicalFile.toPath()
+        require(filePath != rootPath && filePath.parent == rootPath) {
+            "Import path escapes its store"
+        }
+    }
 
     private companion object {
         val JSON = Json { ignoreUnknownKeys = true }
+        val IMPORT_ID = Regex("[0-9a-f]{16}")
+        val STAGING_NAME = Regex("(?:[0-9a-f-]{36}|removed-[0-9a-f-]{36})")
     }
 }

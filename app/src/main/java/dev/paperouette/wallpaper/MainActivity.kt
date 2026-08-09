@@ -105,18 +105,18 @@ class MainActivity : ComponentActivity() {
         val persisted = runCatching {
             resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }.isSuccess
-        (application as PaperouetteApplication).importer.start {
-            source {
-                if (persisted) {
-                    runCatching {
-                        resolver.releasePersistableUriPermission(
-                            uri,
-                            Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                        )
-                    }
+        val release = {
+            if (persisted) {
+                runCatching {
+                    resolver.releasePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    )
                 }
             }
+            Unit
         }
+        (application as PaperouetteApplication).importer.start(source(release))
     }
 
     /** What the picker calls the file, for when a pack does not name itself. */
