@@ -306,6 +306,11 @@ class PaperouetteUiTest {
         // The piece's name is on the sheet's top row as well as on its tile; only the tile is a
         // target.
         compose.onNode(hasTextExactly("Pocket Planetarium") and hasClickAction()).performClick()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodes(hasTextExactly("Pocket Planetarium") and hasNoClickAction())
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.waitForIdle()
 
         // Strip tiles are named rather than labelled: within a piece the names are long and alike,
         // so the tile shows the artwork and tells a screen reader the name. The strip is lazy, so
