@@ -20,6 +20,7 @@ AGENTS.local.md
 dist/
 tools/__pycache__/
 tools/artwork/__pycache__/
+design/
 
 # The artwork is a build product of tools/catalog/ and tools/artwork/, rebuilt byte
 # for byte by tools/generate_catalog.py. Only the manifests it writes alongside the
