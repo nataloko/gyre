@@ -16,6 +16,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasNoClickAction
@@ -40,6 +41,7 @@ import dev.paperouette.wallpaper.PaperouetteApplication
 import dev.paperouette.wallpaper.MainActivity
 import dev.paperouette.wallpaper.data.ActiveSelection
 import dev.paperouette.wallpaper.data.PaperouetteSettings
+import dev.paperouette.wallpaper.data.ShuffleScope
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -204,6 +206,28 @@ class PaperouetteUiTest {
         compose.onNodeWithTag("fader_random_change")
             .performSemanticsAction(SemanticsActions.SetProgress) { it(12f) }
         compose.onNodeWithText("12 hours").assertIsDisplayed()
+    }
+
+    @Test
+    fun shuffleScopeGovernsTheButtonAndExplainsAnEmptyPool() {
+        compose.onNodeWithTag("open_behaviour").performClick()
+        compose.onNodeWithTag("behaviour_panel").performScrollToKey("shuffle_scope")
+
+        compose.onNodeWithTag("shuffle_scope_everything").assertIsSelected()
+        compose.onNodeWithTag("shuffle_scope_favorites").performClick().assertIsSelected()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            val application = InstrumentationRegistry.getInstrumentation()
+                .targetContext.applicationContext as PaperouetteApplication
+            application.settings.settings.value.shuffleScope == ShuffleScope.FAVORITES
+        }
+
+        compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodes(hasTestTag("shuffle")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("shuffle").performClick()
+
+        compose.onNodeWithText("No other variants in this shuffle pool").assertIsDisplayed()
     }
 
     /** Installed over adb rather than from a store, so the build has to say which one it is. */

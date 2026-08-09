@@ -534,6 +534,147 @@ class SettingsRepositoryTest {
     }
 
     @Test
+    fun shuffleScopeDefaultsSafelyAndIsPersisted() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = context.newStoreFile("shuffle-scope")
+        val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { file }
+        store.edit { it[stringPreferencesKey("shuffle_scope")] = "NOT_A_SCOPE" }
+        val repository = DataStoreSettingsRepository(
+            context = context,
+            catalogues = FakeCatalogue,
+            scope = backgroundScope,
+            dataStoreOverride = store,
+        )
+        runCurrent()
+
+        assertEquals(ShuffleScope.EVERYTHING, repository.settings.value.shuffleScope)
+
+        repository.update { it.copy(shuffleScope = ShuffleScope.FAVORITES) }
+        assertEquals(
+            ShuffleScope.FAVORITES,
+            repository.settings.first { it.shuffleScope == ShuffleScope.FAVORITES }.shuffleScope,
+        )
+        assertEquals("FAVORITES", store.data.first()[stringPreferencesKey("shuffle_scope")])
+    }
+
+    @Test
+    fun manualShuffleUsesTheCurrentPieceAndRemembersItsDraw() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = context.newStoreFile("shuffle-piece")
+        val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { file }
+        val repository = DataStoreSettingsRepository(
+            context = context,
+            catalogues = FakeCatalogue,
+            scope = backgroundScope,
+            dataStoreOverride = store,
+            random = Random(2),
+        )
+        runCurrent()
+
+        repository.selectRemix("maelstrom_hue_moss", darkMode = false)
+        repository.update { it.copy(shuffleScope = ShuffleScope.CURRENT_PIECE) }
+
+        assertEquals(ShuffleResult.SHUFFLED, repository.shuffle(darkMode = false))
+        val shuffled = repository.selection.first {
+            it.designId == "maelstrom" && it.remixId != "maelstrom_hue_moss"
+        }
+
+        repository.selectDesign("halo", darkMode = false)
+        repository.selection.first { it.designId == "halo" }
+        repository.selectDesign("maelstrom", darkMode = false)
+        assertEquals(
+            shuffled.remixId,
+            repository.selection.first { it.designId == "maelstrom" }.remixId,
+        )
+    }
+
+    @Test
+    fun manualShufflePrefersTheSystemThemeInsideItsPool() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = context.newStoreFile("shuffle-theme")
+        val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { file }
+        val repository = DataStoreSettingsRepository(
+            context = context,
+            catalogues = FakeCatalogue,
+            scope = backgroundScope,
+            dataStoreOverride = store,
+            random = Random(4),
+        )
+        runCurrent()
+
+        repository.selectRemix("maelstrom_hue_moss", darkMode = false)
+        assertEquals(ShuffleResult.SHUFFLED, repository.shuffle(darkMode = true))
+        val selectedId = repository.selection.first { it.remixId != "maelstrom_hue_moss" }.remixId
+        val selected = FakeCatalogue.current.value.remix(selectedId)
+
+        assertTrue(selected.isDark)
+    }
+
+    @Test
+    fun favouritesShuffleFallsBackToItsPoolAndReportsWhenItIsEmpty() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = context.newStoreFile("shuffle-favourites")
+        val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { file }
+        val repository = DataStoreSettingsRepository(
+            context = context,
+            catalogues = FakeCatalogue,
+            scope = backgroundScope,
+            dataStoreOverride = store,
+            random = Random(1),
+        )
+        runCurrent()
+
+        repository.selectRemix("maelstrom_hue_moss", darkMode = false)
+        repository.update {
+            it.copy(
+                shuffleScope = ShuffleScope.FAVORITES,
+                favorites = setOf("nightfall_fx_haze"),
+            )
+        }
+        assertEquals(ShuffleResult.SHUFFLED, repository.shuffle(darkMode = false))
+        assertEquals(
+            "nightfall_fx_haze",
+            repository.selection.first { it.remixId == "nightfall_fx_haze" }.remixId,
+        )
+
+        repository.update { it.copy(favorites = emptySet()) }
+        val before = repository.selection.value
+        assertEquals(ShuffleResult.NO_ALTERNATIVE, repository.shuffle(darkMode = false))
+        assertEquals(before, repository.selection.value)
+    }
+
+    @Test
+    fun anEmptyTimedPoolLeavesTheSpentIntervalWaiting() = runTest {
+        var now = START_OF_TIME
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = context.newStoreFile("shuffle-waiting")
+        val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { file }
+        val repository = DataStoreSettingsRepository(
+            context = context,
+            catalogues = FakeCatalogue,
+            scope = backgroundScope,
+            dataStoreOverride = store,
+            clock = { now },
+            random = Random(1),
+        )
+        runCurrent()
+
+        repository.update {
+            it.copy(randomChangeHours = 1, shuffleScope = ShuffleScope.FAVORITES)
+        }
+        repository.settings.first { it.randomChangeHours == 1 }
+        now += 2 * HOUR
+
+        assertFalse(repository.shuffleIfDue(darkMode = false))
+        repository.toggleFavorite("maelstrom_hue_slate")
+        assertTrue(repository.shuffleIfDue(darkMode = false))
+        assertEquals(
+            "maelstrom_hue_slate",
+            repository.selection.first { it.remixId == "maelstrom_hue_slate" }.remixId,
+        )
+    }
+
+    @Test
     fun nothingChangesOnItsOwnWhileTheIntervalIsOff() = runTest {
         var now = START_OF_TIME
         val context = ApplicationProvider.getApplicationContext<Context>()

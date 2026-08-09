@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.paperouette.wallpaper.BuildConfig
 import dev.paperouette.wallpaper.data.PaperouetteSettings
+import dev.paperouette.wallpaper.data.ShuffleScope
 import dev.paperouette.wallpaper.data.MAX_RANDOM_CHANGE_HOURS
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -167,6 +169,33 @@ fun BehaviourPanel(
                     onChecked = onAutomaticDarkChanged,
                 )
             }
+            item("shuffle_scope") {
+                Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text(
+                        "Shuffle from",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth().selectableGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ShuffleScope.entries.forEach { scope ->
+                            PaperouetteChoiceChip(
+                                label = when (scope) {
+                                    ShuffleScope.EVERYTHING -> "Everything"
+                                    ShuffleScope.FAVORITES -> "Favourites"
+                                    ShuffleScope.CURRENT_PIECE -> "This piece"
+                                },
+                                selected = settings.shuffleScope == scope,
+                                modifier = Modifier.testTag("shuffle_scope_${scope.name.lowercase()}"),
+                                onClick = { onUpdate { it.copy(shuffleScope = scope) } },
+                            )
+                        }
+                    }
+                }
+            }
             item("random_change") {
                 PaperouetteFader(
                     title = "Change on its own",
@@ -185,7 +214,7 @@ fun BehaviourPanel(
             }
             item("random_change_note") {
                 PaperouetteBodyText(
-                    "A piece and variant picked at random, arriving the next time the home " +
+                    "A variant picked from the shuffle pool, arriving the next time the home " +
                         "screen comes up after the time is out.",
                     modifier = Modifier.padding(top = 2.dp, bottom = 8.dp),
                 )

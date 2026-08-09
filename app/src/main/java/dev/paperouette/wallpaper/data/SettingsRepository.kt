@@ -76,8 +76,14 @@ data class PaperouetteSettings(
      * early — see the deliberate choice in AGENTS.md for why there is no alarm.
      */
     val randomChangeHours: Int = 0,
+    /** Which part of the collection both manual and timed shuffle draw from. */
+    val shuffleScope: ShuffleScope = ShuffleScope.EVERYTHING,
     val favorites: Set<String> = emptySet(),
 )
+
+enum class ShuffleScope { EVERYTHING, FAVORITES, CURRENT_PIECE }
+
+enum class ShuffleResult { SHUFFLED, NO_ALTERNATIVE }
 
 /** A day, past which "on its own" stops meaning anything a wallpaper can be watched for. */
 const val MAX_RANDOM_CHANGE_HOURS = 24
@@ -123,7 +129,7 @@ interface SettingsRepository {
     suspend fun applyDarkMode(darkMode: Boolean)
     suspend fun nextRemix(darkMode: Boolean)
     suspend fun nextDesign(darkMode: Boolean)
-    suspend fun shuffle(darkMode: Boolean)
+    suspend fun shuffle(darkMode: Boolean): ShuffleResult
 
     /**
      * Changes to a random variant when [PaperouetteSettings.randomChangeHours] has elapsed since the last
@@ -339,28 +345,19 @@ class DataStoreSettingsRepository(
         selectDesign(next.id, darkMode)
     }
 
-    /** A variant from anywhere in the collection, other than the one showing. */
-    private fun randomRemix(
-        preferences: Preferences,
-        catalogue: CatalogSnapshot,
-        darkMode: Boolean,
-    ): Remix {
-        val candidates = catalogue.remixes.let { remixes ->
-            if (settingsFrom(preferences, catalogue).automaticDarkVariants) {
-                remixes.filter { it.isDark == darkMode }.ifEmpty { remixes }
-            } else {
-                remixes
-            }
-        }
-        val current = activeRemix(preferences, catalogue).id
-        return candidates.filterNot { it.id == current }.randomOrNull(random)
-            ?: candidates.first()
-    }
-
-    override suspend fun shuffle(darkMode: Boolean) {
+    override suspend fun shuffle(darkMode: Boolean): ShuffleResult {
         val preferences = safeData.first()
         val catalogue = catalogues.current.value
-        selectRemix(randomRemix(preferences, catalogue, darkMode).id, darkMode)
+        val current = activeRemix(preferences, catalogue)
+        val candidate = ShufflePicker.pick(
+            settingsFrom(preferences, catalogue),
+            current,
+            catalogue,
+            darkMode,
+            random,
+        ) ?: return ShuffleResult.NO_ALTERNATIVE
+        activate(candidate, darkMode, remember = true)
+        return ShuffleResult.SHUFFLED
     }
 
     /**
@@ -378,7 +375,8 @@ class DataStoreSettingsRepository(
     override suspend fun shuffleIfDue(darkMode: Boolean): Boolean {
         val preferences = safeData.first()
         val catalogue = catalogues.current.value
-        val hours = settingsFrom(preferences, catalogue).randomChangeHours
+        val settings = settingsFrom(preferences, catalogue)
+        val hours = settings.randomChangeHours
         if (hours <= 0) return false
         val now = clock()
         val last = preferences[Keys.LAST_CHANGED]
@@ -389,7 +387,14 @@ class DataStoreSettingsRepository(
             return false
         }
         if (now - last < hours * MILLIS_PER_HOUR) return false
-        activate(randomRemix(preferences, catalogue, darkMode), darkMode, remember = false)
+        val candidate = ShufflePicker.pick(
+            settings,
+            activeRemix(preferences, catalogue),
+            catalogue,
+            darkMode,
+            random,
+        ) ?: return false
+        activate(candidate, darkMode, remember = false)
         return true
     }
 
@@ -432,6 +437,7 @@ class DataStoreSettingsRepository(
                 updated.animationSpeed.coerceIn(0f, MAX_ANIMATION_SPEED)
             val hours = updated.randomChangeHours.coerceIn(0, MAX_RANDOM_CHANGE_HOURS)
             preferences[Keys.RANDOM_CHANGE_HOURS] = hours
+            preferences[Keys.SHUFFLE_SCOPE] = updated.shuffleScope.name
             // A new interval runs from now. Without this it would be measured against whenever the
             // artwork last changed, so turning on "every 24 hours" beside a week-old selection
             // would spend the whole interval the moment the panel was closed.
@@ -540,6 +546,9 @@ class DataStoreSettingsRepository(
             0,
             0..MAX_RANDOM_CHANGE_HOURS,
         ),
+        shuffleScope = preferences[Keys.SHUFFLE_SCOPE]
+            ?.let { stored -> runCatching { ShuffleScope.valueOf(stored) }.getOrNull() }
+            ?: ShuffleScope.EVERYTHING,
         // Recomputed from the catalogue in force rather than snapshotted once at construction:
         // an import adds ids afterwards, and a favourite kept on an imported variant would
         // otherwise be filtered straight back out on every read.
@@ -597,6 +606,7 @@ class DataStoreSettingsRepository(
         val ROTATION_REVERSED = booleanPreferencesKey("rotation_reversed")
         val ANIMATION_SPEED = floatPreferencesKey("animation_speed")
         val RANDOM_CHANGE_HOURS = intPreferencesKey("random_change_hours")
+        val SHUFFLE_SCOPE = stringPreferencesKey("shuffle_scope")
 
         /**
          * When the artwork last changed, by any means.

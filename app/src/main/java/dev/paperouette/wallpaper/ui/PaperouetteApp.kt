@@ -71,6 +71,7 @@ import dev.paperouette.wallpaper.data.ArtworkImporter
 import dev.paperouette.wallpaper.data.CatalogRepository
 import dev.paperouette.wallpaper.data.ImportProgress
 import dev.paperouette.wallpaper.data.SettingsRepository
+import dev.paperouette.wallpaper.data.ShuffleResult
 import dev.paperouette.wallpaper.ui.theme.PaperouetteMotion
 import dev.paperouette.wallpaper.ui.theme.PaperouetteTheme
 import kotlinx.coroutines.delay
@@ -229,7 +230,13 @@ fun PaperouetteApp(
                 resolveArtwork = resolveArtwork,
                 stripState = stripState,
                 onToggleFavorite = { scope.launch { repository.toggleFavorite(activeRemix.id) } },
-                onShuffle = { scope.launch { repository.shuffle(darkMode) } },
+                onShuffle = {
+                    scope.launch {
+                        if (repository.shuffle(darkMode) == ShuffleResult.NO_ALTERNATIVE) {
+                            snackbarHostState.showSnackbar("No other variants in this shuffle pool")
+                        }
+                    }
+                },
                 onSetWallpaper = {
                     if (!onApplyWallpaper()) {
                         scope.launch {

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -382,6 +383,38 @@ fun PaperouetteChip(
             Icon(icon, null, Modifier.size(16.dp), tint = content)
             Spacer(Modifier.width(6.dp))
         }
+        Text(label, style = MaterialTheme.typography.labelMedium, color = content, maxLines = 1)
+    }
+}
+
+/** One option in a mutually exclusive set, drawn in the same vocabulary as a filter chip. */
+@Composable
+fun PaperouetteChoiceChip(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val background by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        animationSpec = PaperouetteMotion.effects(),
+        label = "choiceChip",
+    )
+    val content = if (selected) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Row(
+        modifier = modifier
+            .height(36.dp)
+            .clip(PillShape)
+            .background(background)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, PillShape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = content, maxLines = 1)
     }
 }
