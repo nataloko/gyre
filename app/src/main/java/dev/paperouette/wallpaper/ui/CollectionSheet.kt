@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -550,19 +551,25 @@ private fun ArtworkTile(
                 Box(
                     Modifier
                         .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.45f))
-                        .clickable(onClick = onFavorite),
+                        .size(48.dp)
+                        .clickable(onClick = onFavorite)
+                        .testTag("tile_favorite"),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        if (favorite) "Remove favourite" else "Add favourite",
-                        Modifier.size(18.dp),
-                        tint = if (favorite) MaterialTheme.colorScheme.primary else Color.White,
-                    )
+                    Box(
+                        Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            if (favorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            if (favorite) "Remove favourite" else "Add favourite",
+                            Modifier.size(18.dp),
+                            tint = if (favorite) MaterialTheme.colorScheme.primary else Color.White,
+                        )
+                    }
                 }
             }
         }
@@ -746,6 +753,7 @@ private fun ImportHeader(manifest: ImportManifest, onRemove: () -> Unit) {
         Text(
             if (confirming) "Remove?" else "Remove",
             modifier = Modifier
+                .heightIn(min = 48.dp)
                 .clip(PillShape)
                 .clickable(role = Role.Button) {
                     if (confirming) onRemove() else confirming = true

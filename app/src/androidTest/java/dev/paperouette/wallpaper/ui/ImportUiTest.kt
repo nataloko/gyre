@@ -1,22 +1,33 @@
 package dev.paperouette.wallpaper.ui
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
 import androidx.compose.ui.test.assertHasClickAction
+import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import dev.paperouette.wallpaper.PaperouetteApplication
 import dev.paperouette.wallpaper.MainActivity
 import dev.paperouette.wallpaper.data.ImportProgress
+import dev.paperouette.wallpaper.data.ImportSource
 import dev.paperouette.wallpaper.data.TestPacks
 import dev.paperouette.wallpaper.data.ZipImportSource
 import kotlinx.coroutines.flow.first
@@ -28,6 +39,7 @@ import org.junit.Test
 import org.junit.rules.ExternalResource
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
+import androidx.compose.ui.unit.dp
 
 /**
  * What an import looks like once it has landed.
@@ -126,12 +138,63 @@ class ImportUiTest {
         compose.waitForIdle()
         assertEquals(1, application.importer.imported.value.size)
 
-        compose.onNodeWithTag("remove_import").performClick()
+        compose.onNodeWithTag("remove_import")
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
         compose.waitUntil(timeoutMillis = 5_000) {
             application.importer.imported.value.isEmpty()
         }
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodesWithTag("import_header").fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    @Test
+    fun pictureProgressIsIndeterminateAndCanBeCancelled() {
+        expandSheet()
+        val source = SlowPictures(picture())
+        check(application.importer.start(source)) { "importer rejected the test source" }
+
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithTag("import_status").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("collection_body").performScrollToNode(hasTestTag("import_status"))
+        compose.onNodeWithText("Importing Holiday — 1 picture").assertIsDisplayed()
+        compose.onNodeWithTag("cancel_import")
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+
+        check(source.closed.await(5, TimeUnit.SECONDS)) { "source was not closed by cancel" }
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithTag("import_status").fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    @Test
+    fun aFailureCanBeDismissed() {
+        expandSheet()
+        check(application.importer.start(
+            OneEntrySource(
+                ImportSource.Entry(
+                    "paperouette-pack.json",
+                    8,
+                    "not json".byteInputStream(),
+                ),
+            ),
+        )) { "importer rejected the test source" }
+
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithTag("dismiss_import").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("collection_body").performScrollToNode(hasTestTag("dismiss_import"))
+        compose.onNodeWithTag("dismiss_import")
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithTag("import_status").fetchSemanticsNodes().isEmpty()
         }
     }
 
@@ -141,5 +204,55 @@ class ImportUiTest {
             compose.onAllNodesWithTag("favourites_filter").fetchSemanticsNodes().isNotEmpty()
         }
         compose.waitForIdle()
+    }
+
+    private fun picture(): ByteArray {
+        val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.rgb(40, 120, 200))
+        return ByteArrayOutputStream().also { output ->
+            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+            bitmap.recycle()
+        }.toByteArray()
+    }
+
+    private class OneEntrySource(private val entry: ImportSource.Entry) : ImportSource {
+        override val label = "Broken"
+
+        override fun forEachEntry(visit: (ImportSource.Entry) -> Unit) = visit(entry)
+
+        override fun close() = entry.stream.close()
+    }
+
+    private class SlowPictures(private val picture: ByteArray) : ImportSource {
+        override val label = "Holiday"
+        val closed = CountDownLatch(1)
+        private val blocking = BlockingStream()
+        private val didClose = AtomicBoolean()
+
+        override fun forEachEntry(visit: (ImportSource.Entry) -> Unit) {
+            visit(ImportSource.Entry("one.png", picture.size.toLong(), picture.inputStream()))
+            visit(ImportSource.Entry("two.png", -1, blocking))
+        }
+
+        override fun close() {
+            if (!didClose.compareAndSet(false, true)) return
+            blocking.close()
+            closed.countDown()
+        }
+    }
+
+    private class BlockingStream : InputStream() {
+        private val closed = CountDownLatch(1)
+
+        override fun read(): Int {
+            closed.await()
+            return -1
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int = read()
+
+        override fun close() {
+            closed.countDown()
+        }
     }
 }

@@ -29,8 +29,7 @@ object TestPacks {
         transformManifest: (PackManifest) -> PackManifest = { it },
         transformCatalogue: (Catalog) -> Catalog = { it },
     ): ByteArray {
-        val bundled = Json { ignoreUnknownKeys = true }
-            .decodeFromString<Catalog>(
+        val bundled = JSON.decodeFromString<Catalog>(
                 context.assets.open("catalog/catalog.json").bufferedReader().use { it.readText() },
             )
         val design = bundled.designs.first { it.remixIds.size >= 2 }
@@ -52,7 +51,7 @@ object TestPacks {
         val blobs = paths.associateWith { path ->
             context.assets.open(path.removePrefix("assets/")).use { it.readBytes() }
         }
-        val catalogueJson = Json.encodeToString(Catalog.serializer(), subset)
+        val catalogueJson = JSON.encodeToString(Catalog.serializer(), subset)
         val assets = paths.map { path ->
             val data = blobs.getValue(path)
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -84,7 +83,7 @@ object TestPacks {
         return ByteArrayOutputStream().also { buffer ->
             ZipOutputStream(buffer).use { zip ->
                 zip.putNextEntry(ZipEntry("paperouette-pack.json"))
-                zip.write(Json.encodeToString(PackManifest.serializer(), manifest).toByteArray())
+                zip.write(JSON.encodeToString(PackManifest.serializer(), manifest).toByteArray())
                 zip.closeEntry()
                 zip.putNextEntry(ZipEntry("catalog/catalog.json"))
                 zip.write(catalogueJson.toByteArray())
@@ -114,4 +113,6 @@ object TestPacks {
         digest.update(catalogueJson.encodeToByteArray())
         return digest.digest().joinToString("") { "%02x".format(it) }.take(16)
     }
+
+    private val JSON = Json { ignoreUnknownKeys = true }
 }

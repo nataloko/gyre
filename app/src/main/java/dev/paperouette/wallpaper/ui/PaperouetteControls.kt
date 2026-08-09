@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -46,6 +47,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -69,7 +71,7 @@ val PillShape = RoundedCornerShape(percent = 50)
 private val TRACK_HEIGHT = 6.dp
 private val KNOB_SIZE = 20.dp
 private val KNOB_RING = 3.dp
-private val FADER_HEIGHT = 44.dp
+private val FADER_HEIGHT = 48.dp
 
 /**
  * A labelled value, dragged along a track.
@@ -130,6 +132,7 @@ fun PaperouetteFader(
                 .height(FADER_HEIGHT)
                 .semantics {
                     contentDescription = title
+                    stateDescription = valueLabel(live)
                     progressBarRangeInfo = ProgressBarRangeInfo(live, range, steps)
                     setProgress { target ->
                         live = snap(target)
@@ -194,6 +197,7 @@ fun PaperouetteToggleRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .clip(MaterialTheme.shapes.medium)
             .toggleable(value = checked, role = Role.Switch, onValueChange = onChecked)
             .padding(vertical = 10.dp),
@@ -305,7 +309,7 @@ fun PaperouetteGhostAction(
 ) {
     Row(
         modifier = modifier
-            .height(44.dp)
+            .height(48.dp)
             .clip(PillShape)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, PillShape)
             .clickable(role = Role.Button, onClick = onClick)
@@ -371,7 +375,7 @@ fun PaperouetteChip(
     }
     Row(
         modifier = modifier
-            .height(36.dp)
+            .height(48.dp)
             .clip(PillShape)
             .background(background)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, PillShape)
@@ -407,7 +411,7 @@ fun PaperouetteChoiceChip(
     }
     Row(
         modifier = modifier
-            .height(36.dp)
+            .height(48.dp)
             .clip(PillShape)
             .background(background)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, PillShape)

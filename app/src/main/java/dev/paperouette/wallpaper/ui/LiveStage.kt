@@ -65,6 +65,8 @@ fun LiveStage(
                 contentDescription = "Live wallpaper"
                 stateDescription = when {
                     batteryPaused -> "Paused for battery saver"
+                    settings.stillArtwork -> "Held still"
+                    settings.animationSpeed <= 0f -> "Animation still; touch active"
                     paused -> "Paused"
                     else -> "Animating"
                 }
@@ -104,7 +106,7 @@ fun LiveStage(
                     .padding(end = playEndInset)
                     .statusBarsPadding()
                     .padding(10.dp)
-                    .size(44.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.35f))
                     .clickable(role = Role.Button, onClick = onPlay)

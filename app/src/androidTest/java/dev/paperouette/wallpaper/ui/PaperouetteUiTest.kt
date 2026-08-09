@@ -9,6 +9,7 @@ import android.view.WindowManager
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsOff
@@ -17,6 +18,8 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertHeightIsAtLeast
+import androidx.compose.ui.test.assertWidthIsAtLeast
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasNoClickAction
@@ -51,6 +54,7 @@ import org.junit.Test
 import org.junit.rules.ExternalResource
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
+import androidx.compose.ui.unit.dp
 
 /**
  * The interface is one screen: the artwork at full size, a sheet over it, and two panels over that.
@@ -148,6 +152,9 @@ class PaperouetteUiTest {
             compose.onAllNodesWithContentDescription("Remove favourite")
                 .fetchSemanticsNodes().size >= 2
         }
+        compose.onNodeWithTag("tile_favorite")
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
     }
 
     @Test
@@ -164,6 +171,7 @@ class PaperouetteUiTest {
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodes(hasTextExactly("60%")).fetchSemanticsNodes().isNotEmpty()
         }
+        compose.onNodeWithTag("fader_dim").assert(stageState("60%"))
         compose.onNodeWithTag("close_look").performClick()
         compose.onNodeWithTag("open_look").performClick()
 
@@ -182,10 +190,10 @@ class PaperouetteUiTest {
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodes(hasTextExactly("Still")).fetchSemanticsNodes().isNotEmpty()
         }
-        // The stage says it is animating regardless: holding the scene still is not pausing it, and
-        // a touch still spins it.
+        // Holding the scene animation still is not a full pause: a touch still spins it, which is
+        // why the state names both halves rather than claiming the whole wallpaper is held.
         compose.onNodeWithTag("close_look").performClick()
-        compose.onNodeWithTag("live_stage").assertIsDisplayed()
+        waitForStageState("Animation still; touch active")
     }
 
     /**
@@ -214,7 +222,11 @@ class PaperouetteUiTest {
         compose.onNodeWithTag("behaviour_panel").performScrollToKey("shuffle_scope")
 
         compose.onNodeWithTag("shuffle_scope_everything").assertIsSelected()
-        compose.onNodeWithTag("shuffle_scope_favorites").performClick().assertIsSelected()
+        compose.onNodeWithTag("shuffle_scope_favorites")
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
+            .performClick()
+            .assertIsSelected()
         compose.waitUntil(timeoutMillis = 5_000) {
             val application = InstrumentationRegistry.getInstrumentation()
                 .targetContext.applicationContext as PaperouetteApplication
@@ -228,6 +240,37 @@ class PaperouetteUiTest {
         compose.onNodeWithTag("shuffle").performClick()
 
         compose.onNodeWithText("No other variants in this shuffle pool").assertIsDisplayed()
+    }
+
+    @Test
+    fun holdStillIsReportedAsAStateRatherThanAsAnimation() {
+        compose.onNodeWithTag("open_behaviour").performClick()
+        compose.onNodeWithText("Hold still").performClick()
+
+        waitForStageState("Held still")
+    }
+
+    @Test
+    fun customControlTargetsMeetTheMinimumTouchSize() {
+        compose.onNodeWithTag("enter_play")
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
+
+        expandSheet()
+        compose.onNodeWithTag("favourites_filter")
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
+
+        compose.onNodeWithTag("open_look").performClick()
+        compose.onNodeWithTag("fader_dim")
+            .assertHeightIsAtLeast(48.dp)
+            .performSemanticsAction(SemanticsActions.SetProgress) { it(0.2f) }
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithTag("clear_filters").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("clear_filters")
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
     }
 
     /** Installed over adb rather than from a store, so the build has to say which one it is. */
