@@ -25,20 +25,18 @@ class SceneRendererTest {
 
     /**
      * The fixtures come out of the same maths that draws the artwork, so the renderer and the
-     * reference should agree to within resampling and the layers' lossy encoding. These bounds
-     * were set when the swirl catalogue landed and have not yet been tightened against measured
-     * on-device headroom; once measured, tighten them to just above it — and never loosen one to
-     * make a change pass. The line-art stacks (Planetarium's comets, Truchet's jewels) get the
-     * loosest bounds because their strokes are a pixel or two wide, which is where a mipmap and
-     * a resample disagree most.
+     * reference should agree to within resampling and the layers' lossy encoding. These bounds are
+     * tightened against measured API 37 device headroom; never loosen one to make a change pass. The
+     * line-art stacks (Planetarium's comets, Truchet's jewels) get the loosest bounds because their
+     * strokes are a pixel or two wide, which is where a mipmap and a resample disagree most.
      */
     @Test
     fun representativeZeroMotionScenesMatchBundledPreviews() {
         val cases = listOf(
-            VisualLimit("afterglow_hue_biolume", 0.030f, 0.960f),
-            VisualLimit("planetarium_hue_golden", 0.070f, 0.880f),
-            VisualLimit("quasicrystal_hue_penrose", 0.050f, 0.930f),
-            VisualLimit("truchet_hue_circuit", 0.070f, 0.880f),
+            VisualLimit("afterglow_hue_biolume", 0.005f, 0.999f),
+            VisualLimit("planetarium_hue_golden", 0.010f, 0.960f),
+            VisualLimit("quasicrystal_hue_penrose", 0.020f, 0.980f),
+            VisualLimit("truchet_hue_circuit", 0.050f, 0.950f),
         )
 
         OffscreenRenderer(context).use { renderer ->
